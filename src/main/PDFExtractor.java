@@ -1,3 +1,4 @@
+import javafx.beans.binding.ObjectExpression;
 import org.apache.fontbox.ttf.TrueTypeFont;
 import org.apache.fontbox.util.BoundingBox;
 import org.apache.pdfbox.contentstream.PDFGraphicsStreamEngine;
@@ -27,37 +28,45 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TextDrawImageExtractor extends PDFGraphicsStreamEngine {
+public class PDFExtractor extends PDFGraphicsStreamEngine {
+
+    static boolean hasText = false;
+    static boolean hasDraw = false;
+    static boolean hasImage = false;
 
     public static void main(String[] args) throws IOException {
-        for (String path: args) {
-            Path p = Paths.get(path);
-            if (Files.isDirectory(p)) {
-                FileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
-                    @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        if (file.toString().endsWith(".pdf")) processFile(file);
-                        return FileVisitResult.CONTINUE;
-                    }
-                };
-                Files.walkFileTree(p, visitor);
-            }
-            else processFile(p);
+        String path = "";
+        for (String arg : args) {
+            if (arg.equals("-text")) hasText = true;
+            else if (arg.equals("-draw")) hasDraw = true;
+            else if (arg.equals("-image")) hasImage = true;
+            else path = arg;
         }
-    }
 
-    static void processFile(Path path, Writer w) throws IOException {
-        PDDocument doc = PDDocument.load(path.toFile());
-        for (int i = 5; i < 6; i++) {
-            TextDrawImageExtractor ext = new TextDrawImageExtractor(doc.getPage(i), i, w);
-            ext.processPage(doc.getPage(i));
+        Path p = Paths.get(path);
+        if (Files.isDirectory(p)) {
+            FileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    if (file.toString().endsWith(".pdf")) processFile(file);
+                    return FileVisitResult.CONTINUE;
+                }
+            };
+            Files.walkFileTree(p, visitor);
         }
+        else processFile(p);
     }
 
     static void processFile(Path path) throws IOException {
+        PDDocument doc = PDDocument.load(path.toFile());
         //try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
         try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
-            processFile(path, w);
+            for (int i = 0; i < 2; i++) {
+                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i, w);
+                ext.processPage(doc.getPage(i));
+                ext.write();
+                w.write("\n");
+            }
         }
     }
 
@@ -70,9 +79,9 @@ public class TextDrawImageExtractor extends PDFGraphicsStreamEngine {
     float currentX;
     float currentY;
     List<String> imageBuffer;
-    List<String> buffer;
+    List<Object> buffer = new ArrayList<>();
 
-    public TextDrawImageExtractor(PDPage page, int pageIndex, Writer output) throws IOException {
+    public PDFExtractor(PDPage page, int pageIndex, Writer output) throws IOException {
         super(page);
         this.pageIndex = pageIndex;
         this.output = output;
@@ -96,6 +105,13 @@ public class TextDrawImageExtractor extends PDFGraphicsStreamEngine {
 
     float getPageHeight() { return getPage().getCropBox().getHeight(); }
 
+    void addText(TextPosition p) {
+        if (hasText) buffer.add(p);
+    }
+    void addDraw(String op, Object... values) {
+        if (hasDraw) buffer.add(new DrawPosition(op, values));
+    }
+
     void writeLine(Object... values) throws IOException {
         List<String> l = new ArrayList<>();
         for (Object o : values) l.add(String.valueOf(o));
@@ -103,25 +119,71 @@ public class TextDrawImageExtractor extends PDFGraphicsStreamEngine {
         output.write("\n");
     }
 
-    void tokenize() {
-        String prevOp = "";
-        for (String str : buffer) {
-            String[] items = str.split("\t");
-            String op = items[0];
-
+    void writeText(List<TextPosition> textBuffer) throws IOException {
+        for (TextPosition p : textBuffer) {
+            PDFont font = p.getFont();
+            PDFontDescriptor fontDesc = font.getFontDescriptor();
+            float descent = fontDesc.getDescent() / 1000F;
+            writeLine("TEXT", pageIndex+1, p.getUnicode(), p.getXDirAdj(), p.getYDirAdj(), p.getWidthDirAdj(), p.getHeightDir(),
+                    descent, font.getName(), p.getFontSize(), p.getWidthOfSpace());
         }
+        writeLine("");
+        textBuffer.clear();
+    }
+
+    void write() throws IOException {
+        List<TextPosition> textBuffer = new ArrayList<>();
+        float averageW = 0;
+        String prevType = null;
+
+        for (Object obj : buffer) {
+            String type = "";
+            if (obj instanceof TextPosition) type = "TEXT";
+            else if (obj instanceof DrawPosition) type = "DRAW";
+            assert !type.equals("");
+
+            if (prevType != null && !type.equals(prevType)) writeLine("");
+            prevType = type;
+
+            if (type.equals("TEXT")) {
+                TextPosition p = (TextPosition)obj;
+                if (textBuffer.isEmpty()) {
+                    averageW = p.getWidth();
+                }
+                else {
+                    TextPosition prev = textBuffer.get(textBuffer.size() - 1);
+                    float expectedX = prev.getX() + prev.getWidth() + averageW * 0.3f;
+                    float y1 = prev.getY();
+                    float h1 = prev.getHeight();
+                    float y2 = p.getY();
+                    float h2 = p.getHeight();
+                    boolean overlapped = (y2 < y1+0.1f && y2 > y1-0.1f) || (y2 <= y1 && y2 >= y1-h1) || (y1 <= y2 && y1 >= y2-h2);
+                    if (p.getX() > expectedX || !overlapped) {
+                        writeText(textBuffer);
+                        averageW = 0;
+                    }
+                    else averageW = (averageW + p.getWidth()) / 2;
+                }
+                textBuffer.add(p);
+            }
+            else if (type.equals("DRAW")) {
+                DrawPosition p = (DrawPosition)obj;
+                writeLine(type, pageIndex+1);
+            }
+        }
+        if (!textBuffer.isEmpty()) writeText(textBuffer);
     }
 
     @Override
     public void drawImage(PDImage pdImage) throws IOException {
-        String s = imageBuffer.get(0);
-        imageBuffer.remove(0);
-        writeLine("IMAGE", pageIndex+1, s);
+        // String s = imageBuffer.get(0);
+        // imageBuffer.remove(0);
+        // writeLine("IMAGE", pageIndex+1, s);
     }
 
     @Override
     public void appendRectangle(Point2D p0, Point2D p1, Point2D p2, Point2D p3) throws IOException {
-        writeLine("DRAW", pageIndex+1, "RECTANGLE", p0.getX(), p0.getY(), p1.getX(), p1.getY(), p2.getX(), p2.getY(), p3.getX(), p3.getY());
+        addDraw("RECTANGLE", p0.getX(), p0.getY(), p1.getX(), p1.getY(), p2.getX(), p2.getY(), p3.getX(), p3.getY());
     }
 
     @Override
@@ -140,8 +202,8 @@ public class TextDrawImageExtractor extends PDFGraphicsStreamEngine {
         float x2 = currentX;
         float y2 = getPageHeight() - currentY;
 
-        if (x1 > x2 || (x1 == x2 && y1 > y2)) writeLine("DRAW", pageIndex+1, "LINE", x2, y2, x1-x2, y1-y2);
-        else writeLine("DRAW", pageIndex+1, "LINE", x1, y1, x2-x1, y2-y1);
+        if (x1 > x2 || (x1 == x2 && y1 > y2)) addDraw("LINE", x2, y2, x1-x2, y1-y2);
+        else addDraw("LINE", x1, y1, x2-x1, y2-y1);
 
         currentX = x;
         currentY = y;
@@ -149,7 +211,7 @@ public class TextDrawImageExtractor extends PDFGraphicsStreamEngine {
 
     @Override
     public void curveTo(float x1, float y1, float x2, float y2, float x3, float y3) throws IOException {
-        writeLine("DRAW", pageIndex+1, "CURVE_TO", x1, y1, x2, y2, x3, y3);
+        addDraw("CURVE_TO", x1, y1, x2, y2, x3, y3);
     }
 
     @Override
@@ -162,13 +224,13 @@ public class TextDrawImageExtractor extends PDFGraphicsStreamEngine {
     public void endPath() throws IOException { }
 
     @Override
-    public void strokePath() throws IOException { writeLine("DRAW", pageIndex+1, "STROKE_PATH"); }
+    public void strokePath() throws IOException { addDraw("STROKE_PATH"); }
 
     @Override
-    public void fillPath(int i) throws IOException { writeLine("DRAW", pageIndex+1, "FILL_PATH"); }
+    public void fillPath(int i) throws IOException { addDraw("FILL_PATH"); }
 
     @Override
-    public void fillAndStrokePath(int i) throws IOException { writeLine("DRAW", pageIndex+1, "FILL_AND_STROKE_PATH"); }
+    public void fillAndStrokePath(int i) throws IOException { addDraw("FILL_AND_STROKE_PATH"); }
 
     @Override
     public void shadingFill(COSName cosName) throws IOException { }
@@ -268,10 +330,17 @@ public class TextDrawImageExtractor extends PDFGraphicsStreamEngine {
         TextPosition p = new TextPosition(pageRotation, pageSize.getWidth(), pageSize.getHeight(), translatedTextRenderingMatrix,
                 nextX, nextY, Math.abs(dyDisplay), dxDisplay, Math.abs(spaceWidthDisplay),
                 unicode, new int[]{code}, font, fontSize, (int)(fontSize * textMatrix.getScalingFactorX()));
-        PDFontDescriptor fontDesc = font.getFontDescriptor();
-        float descent = fontDesc.getDescent() / 1000F;
-        writeLine("TEXT", pageIndex+1, unicode, p.getXDirAdj(), p.getYDirAdj(), p.getWidthDirAdj(), p.getHeightDir(),
-                descent, font.getName(), fontSize, p.getWidthOfSpace());
+        addText(p);
+    }
+
+    public class DrawPosition {
+        String op;
+        Object[] values;
+
+        public DrawPosition(String op, Object[] values) {
+            this.op = op;
+            this.values = values;
+        }
     }
 
     public class ImageExtractor extends PDFStreamEngine {
