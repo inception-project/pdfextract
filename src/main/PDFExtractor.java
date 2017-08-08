@@ -61,7 +61,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         PDDocument doc = PDDocument.load(path.toFile());
         //try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
         try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i < doc.getNumberOfPages(); i++) {
                 PDFExtractor ext = new PDFExtractor(doc.getPage(i), i, w);
                 ext.processPage(doc.getPage(i));
                 ext.write();
