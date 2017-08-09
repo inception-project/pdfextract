@@ -127,7 +127,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             writeLine("TEXT", pageIndex+1, p.getUnicode(), p.getXDirAdj(), p.getYDirAdj(), p.getWidthDirAdj(), p.getHeightDir(),
                     descent, font.getName(), p.getFontSize(), p.getWidthOfSpace());
         }
-        writeLine("");
         textBuffer.clear();
     }
 
@@ -145,7 +144,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             if (prevType != null && !type.equals(prevType)) writeLine("");
             prevType = type;
 
-            if (type.equals("TEXT")) {
+            if (type.equals("TEXT") && hasText) {
                 TextPosition p = (TextPosition)obj;
                 if (textBuffer.isEmpty()) {
                     averageW = p.getWidth();
@@ -160,6 +159,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                     boolean overlapped = (y2 < y1+0.1f && y2 > y1-0.1f) || (y2 <= y1 && y2 >= y1-h1) || (y1 <= y2 && y1 >= y2-h2);
                     if (p.getX() > expectedX || !overlapped) {
                         writeText(textBuffer);
+                        writeLine("");
                         averageW = 0;
                     }
                     else averageW = (averageW + p.getWidth()) / 2;
