@@ -28,7 +28,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PDFExtractor extends PDFGraphicsStreamEngine {
+public class PDFExtractor2 extends PDFGraphicsStreamEngine {
 
     static boolean hasText = false;
     static boolean hasDraw = false;
@@ -44,19 +44,20 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         }
 
         Path p = Paths.get(path);
-        PDDocument doc = PDDocument.load(p.toFile());
-        //try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
-        try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
-            for (int i = 0; i < doc.getNumberOfPages(); i++) {
-                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i, w);
-                ext.processPage(doc.getPage(i));
-                ext.write();
-                w.write("\n");
-            }
+        if (Files.isDirectory(p)) {
+            FileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    if (file.toString().endsWith(".pdf")) processFile(file);
+                    return FileVisitResult.CONTINUE;
+                }
+            };
+            Files.walkFileTree(p, visitor);
         }
+        else processFile(p);
     }
 
-    static void process() throws IOException {
+    static void processFile(Path path) throws IOException {
         PDDocument doc = PDDocument.load(path.toFile());
         //try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
         try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
@@ -80,7 +81,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     List<String> imageBuffer;
     List<Object> buffer = new ArrayList<>();
 
-    public PDFExtractor(PDPage page, int pageIndex, Writer output) throws IOException {
+    public PDFExtractor2(PDPage page, int pageIndex, Writer output) throws IOException {
         super(page);
         this.pageIndex = pageIndex;
         this.output = output;
