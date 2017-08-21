@@ -30,19 +30,8 @@ import java.util.List;
 
 public class PDFExtractor extends PDFGraphicsStreamEngine {
 
-    static boolean hasText = false;
-    static boolean hasDraw = false;
-    static boolean hasImage = false;
-
     public static void main(String[] args) throws IOException {
-        String path = "";
-        for (String arg : args) {
-            if (arg.equals("-text")) hasText = true;
-            else if (arg.equals("-draw")) hasDraw = true;
-            else if (arg.equals("-image")) hasImage = true;
-            else path = arg;
-        }
-
+        String path = args[0];
         Path p = Paths.get(path);
         PDDocument doc = PDDocument.load(p.toFile());
         //try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
@@ -51,20 +40,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 PDFExtractor ext = new PDFExtractor(doc.getPage(i), i, w);
                 ext.processPage(doc.getPage(i));
                 ext.write();
-                w.write("\n");
-            }
-        }
-    }
-
-    static void process() throws IOException {
-        PDDocument doc = PDDocument.load(path.toFile());
-        //try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
-        try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
-            for (int i = 0; i < doc.getNumberOfPages(); i++) {
-                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i, w);
-                ext.processPage(doc.getPage(i));
-                ext.write();
-                w.write("\n");
             }
         }
     }
@@ -75,9 +50,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     PDRectangle pageSize;
     Matrix translateMatrix;
     final GlyphList glyphList;
-    float currentX;
-    float currentY;
-    List<String> imageBuffer;
+    List<Image> imageBuffer;
     List<Object> buffer = new ArrayList<>();
 
     public PDFExtractor(PDPage page, int pageIndex, Writer output) throws IOException {
@@ -105,84 +78,60 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     float getPageHeight() { return getPage().getCropBox().getHeight(); }
 
     void addText(TextPosition p) {
-        if (hasText) buffer.add(p);
-    }
-    void addDraw(String op, Object... values) {
-        if (hasDraw) buffer.add(new DrawPosition(op, values));
+        buffer.add(new Text(p));
     }
 
-    void writeLine(Object... values) throws IOException {
+    void addDraw(String op, float... values) {
+        buffer.add(new Draw(op, values));
+    }
+
+    void writeLine(String type, Object... values) throws IOException {
         List<String> l = new ArrayList<>();
         for (Object o : values) l.add(String.valueOf(o));
-        output.write(String.join("\t", l));
+        output.write(String.valueOf(pageIndex+1));
+        output.write("\t");
+        output.write(type);
+        output.write("\t");
+        output.write(String.join(" ", l));
         output.write("\n");
     }
 
-    void writeText(List<TextPosition> textBuffer) throws IOException {
-        for (TextPosition p : textBuffer) {
-            PDFont font = p.getFont();
-            PDFontDescriptor fontDesc = font.getFontDescriptor();
-            float descent = fontDesc.getDescent() / 1000F;
-            writeLine("TEXT", pageIndex+1, p.getUnicode(), p.getXDirAdj(), p.getYDirAdj(), p.getWidthDirAdj(), p.getHeightDir(),
-                    descent, font.getName(), p.getFontSize(), p.getWidthOfSpace());
-        }
-        textBuffer.clear();
-    }
-
     void write() throws IOException {
-        List<TextPosition> textBuffer = new ArrayList<>();
-        float averageW = 0;
-        String prevType = null;
-
         for (Object obj : buffer) {
             String type = "";
-            if (obj instanceof TextPosition) type = "TEXT";
-            else if (obj instanceof DrawPosition) type = "DRAW";
-            assert !type.equals("");
+            if (obj instanceof Text) type = "TEXT";
+            else if (obj instanceof Draw) type = "DRAW";
+            else if (obj instanceof Image) type = "IMAGE";
 
-            if (prevType != null && !type.equals(prevType)) writeLine("");
-            prevType = type;
-
-            if (type.equals("TEXT") && hasText) {
-                TextPosition p = (TextPosition)obj;
-                if (textBuffer.isEmpty()) {
-                    averageW = p.getWidth();
-                }
-                else {
-                    TextPosition prev = textBuffer.get(textBuffer.size() - 1);
-                    float expectedX = prev.getX() + prev.getWidth() + averageW * 0.3f;
-                    float y1 = prev.getY();
-                    float h1 = prev.getHeight();
-                    float y2 = p.getY();
-                    float h2 = p.getHeight();
-                    boolean overlapped = (y2 < y1+0.1f && y2 > y1-0.1f) || (y2 <= y1 && y2 >= y1-h1) || (y1 <= y2 && y1 >= y2-h2);
-                    if (p.getX() > expectedX || !overlapped) {
-                        writeText(textBuffer);
-                        writeLine("");
-                        averageW = 0;
-                    }
-                    else averageW = (averageW + p.getWidth()) / 2;
-                }
-                textBuffer.add(p);
+            if (type.equals("TEXT")) {
+                Text t = (Text)obj;
+                writeLine(type, t.value, t.x, t.y, t.w, t.h, t.fontSize, t.fontName);
             }
             else if (type.equals("DRAW")) {
-                DrawPosition p = (DrawPosition)obj;
-                writeLine(type, pageIndex+1);
+                Draw d = (Draw)obj;
+                List<String> l = new ArrayList<>();
+                for (Object o : d.values) l.add(String.valueOf(o));
+                if (l.isEmpty()) writeLine(type, d.op);
+                else writeLine(type, d.op, String.join(" ", l));
+            }
+            else if (type.equals("IMAGE")) {
+                Image i = (Image)obj;
+                writeLine(type, i.x, i.y, i.w, i.h);
             }
         }
-        if (!textBuffer.isEmpty()) writeText(textBuffer);
     }
 
     @Override
     public void drawImage(PDImage pdImage) throws IOException {
-        String s = imageBuffer.get(0);
+        Image i = imageBuffer.get(0);
+        buffer.add(i);
         imageBuffer.remove(0);
-        writeLine("IMAGE", pageIndex+1, s);
     }
 
     @Override
     public void appendRectangle(Point2D p0, Point2D p1, Point2D p2, Point2D p3) throws IOException {
-        addDraw("RECTANGLE", p0.getX(), p0.getY(), p1.getX(), p1.getY(), p2.getX(), p2.getY(), p3.getX(), p3.getY());
+        addDraw("RECTANGLE", (float)p0.getX(), (float)p0.getY(), (float)p1.getX(), (float)p1.getY(),
+                (float)p2.getX(), (float)p2.getY(), (float)p3.getX(), (float)p3.getY());
     }
 
     @Override
@@ -190,31 +139,22 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     @Override
     public void moveTo(float x, float y) throws IOException {
-        currentX = x;
-        currentY = y;
+        addDraw("MOVE_TO", x, getPageHeight() - y);
     }
 
     @Override
     public void lineTo(float x, float y) throws IOException {
-        float x1 = x;
-        float y1 = getPageHeight() - y;
-        float x2 = currentX;
-        float y2 = getPageHeight() - currentY;
-
-        if (x1 > x2 || (x1 == x2 && y1 > y2)) addDraw("LINE", x2, y2, x1-x2, y1-y2);
-        else addDraw("LINE", x1, y1, x2-x1, y2-y1);
-
-        currentX = x;
-        currentY = y;
+        addDraw("LINE_TO", x, getPageHeight() - y);
     }
 
     @Override
     public void curveTo(float x1, float y1, float x2, float y2, float x3, float y3) throws IOException {
-        addDraw("CURVE_TO", x1, y1, x2, y2, x3, y3);
+        float h = getPageHeight();
+        addDraw("CURVE_TO", x1, h - y1, x2, h - y2, x3, h - y3);
     }
 
     @Override
-    public Point2D getCurrentPoint() throws IOException { return new Point2D.Float(currentX, currentY); }
+    public Point2D getCurrentPoint() throws IOException { return new Point2D.Float(0.0f, 0.0f); }
 
     @Override
     public void closePath() throws IOException { }
@@ -229,7 +169,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     public void fillPath(int i) throws IOException { addDraw("FILL_PATH"); }
 
     @Override
-    public void fillAndStrokePath(int i) throws IOException { addDraw("FILL_AND_STROKE_PATH"); }
+    public void fillAndStrokePath(int i) throws IOException { addDraw("FILL_STROKE_PATH"); }
 
     @Override
     public void shadingFill(COSName cosName) throws IOException { }
@@ -332,19 +272,56 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         addText(p);
     }
 
-    public class DrawPosition {
-        String op;
-        Object[] values;
+    public class Text {
+        String value;
+        float x;
+        float y;
+        float w;
+        float h;
+        float fontSize;
+        String fontName;
 
-        public DrawPosition(String op, Object[] values) {
+        public Text(TextPosition p) {
+            this.value = p.getUnicode();
+            this.x = p.getXDirAdj();
+            this.y = p.getYDirAdj();
+            this.w = p.getWidthDirAdj();
+            this.h = p.getHeightDir();
+            this.fontSize = p.getFontSize();
+            this.fontName = p.getFont().getName();
+            //PDFont font = p.getFont();
+            //PDFontDescriptor fontDesc = font.getFontDescriptor();
+            //float descent = fontDesc.getDescent() / 1000F;
+        }
+    }
+
+    public class Draw {
+        String op;
+        float[] values;
+
+        public Draw(String op, float[] values) {
             this.op = op;
             this.values = values;
         }
     }
 
+    public class Image {
+        float x;
+        float y;
+        float w;
+        float h;
+
+        public Image(float x, float y, float w, float h) {
+            this.x = x;
+            this.y = y;
+            this.w = w;
+            this.h = h;
+        }
+    }
+
     public class ImageExtractor extends PDFStreamEngine {
 
-        List<String> buffer = new ArrayList<>();
+        List<Image> buffer = new ArrayList<>();
 
         public ImageExtractor() throws IOException {
             addOperator(new Concatenate());
@@ -353,12 +330,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             addOperator(new Save());
             addOperator(new Restore());
             addOperator(new SetMatrix());
-        }
-
-        void addLine(Object... values) throws IOException {
-            List<String> l = new ArrayList<>();
-            for (Object o : values) l.add(String.valueOf(o));
-            buffer.add(String.join("\t", l));
         }
 
         @Override
@@ -376,7 +347,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                     float h = ctmNew.getScalingFactorY();
                     float x = ctmNew.getTranslateX();
                     float y = pageRect.getHeight() - ctmNew.getTranslateY() - h;
-                    addLine(x, y, w, h);
+                    buffer.add(new Image(x, y, w, h));
                 }
                 else if(xobject instanceof PDFormXObject) {
                     PDFormXObject form = (PDFormXObject)xobject;
