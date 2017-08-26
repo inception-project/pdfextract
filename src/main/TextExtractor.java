@@ -111,7 +111,7 @@ public class TextExtractor extends PDFGraphicsStreamEngine {
                 float y2 = text.y;
                 float h2 = text.h;
                 boolean overlapped = (y2 < y1+0.1f && y2 > y1-0.1f) || (y2 <= y1 && y2 >= y1-h1) || (y1 <= y2 && y1 >= y2-h2);
-                boolean consistent = y1 == y2 && h1 == h2 && prev.fontSize == text.fontSize && prev.font.getName() == text.font.getName();
+                boolean consistent = y1 == y2 && h1 == h2 && prev.font.getName() == text.font.getName();
                 if (text.x > expectedX || !overlapped || !consistent) {
                     writeText(buffer);
                     buffer.clear();
@@ -258,35 +258,9 @@ public class TextExtractor extends PDFGraphicsStreamEngine {
         TextPosition p = new TextPosition(pageRotation, pageSize.getWidth(), pageSize.getHeight(), translatedTextRenderingMatrix,
                 nextX, nextY, Math.abs(dyDisplay), dxDisplay, Math.abs(spaceWidthDisplay),
                 unicode, new int[]{code}, font, fontSize, (int)(fontSize * textMatrix.getScalingFactorX()));
-        try {
-            texts.add(new Text(p));
-        }
-        catch (Exception e) { }
-    }
-
-    public class Text {
-        String unicode;
-        PDFont font;
-        float fontSize;
-        float x;
-        float y;
-        float w;
-        float h;
-
-        public Text(TextPosition p) throws IOException {
-            this.unicode = p.getUnicode();
-            this.font = p.getFont();
-            PDFontDescriptor fontDesc = font.getFontDescriptor();
-            this.fontSize = p.getFontSize();
-
-            this.x = p.getX();
-            this.y = p.getY();
-            //this.w = p.getWidthDirAdj();
-            this.w = font.getStringWidth(unicode) * fontSize / 1000f;
-            this.h = (fontDesc.getAscent() - fontDesc.getDescent()) * fontSize / 1000f;
-            this.y -= fontDesc.getDescent() / 1000f * fontSize;
-            this.y -= h;
-            // h = fontDesc.getFontBoundingBox().getHeight() / 1000f * fontSize;
-        }
+        //try {
+        //    texts.add(new Text(p));
+        //}
+        //catch (Exception e) { }
     }
 }

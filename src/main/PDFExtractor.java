@@ -17,11 +17,18 @@ import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImage;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.state.PDGraphicsState;
+import org.apache.pdfbox.pdmodel.interactive.pagenavigation.PDThreadBead;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 import org.apache.pdfbox.util.Vector;
 
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -36,10 +43,10 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         PDDocument doc = PDDocument.load(p.toFile());
         //try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
         try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
-            for (int i = 0; i < doc.getNumberOfPages(); i++) {
+            for (int i = 0; i < 1; i++) {
                 PDFExtractor ext = new PDFExtractor(doc.getPage(i), i, w);
                 ext.processPage(doc.getPage(i));
-                ext.write();
+                ext.write2();
             }
         }
     }
@@ -52,6 +59,10 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     final GlyphList glyphList;
     List<Image> imageBuffer;
     List<Object> buffer = new ArrayList<>();
+
+    AffineTransform flipAT;
+    AffineTransform rotateAT;
+    AffineTransform transAT;
 
     public PDFExtractor(PDPage page, int pageIndex, Writer output) throws IOException {
         super(page);
@@ -70,6 +81,36 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             this.translateMatrix = Matrix.getTranslateInstance(-this.pageSize.getLowerLeftX(), -this.pageSize.getLowerLeftY());
         }
 
+        // taken from DrawPrintTextLocations for setting flipAT, rotateAT and transAT
+        PDRectangle cropBox = page.getCropBox();
+        // flip y-axis
+        flipAT = new AffineTransform();
+        flipAT.translate(0, page.getBBox().getHeight());
+        flipAT.scale(1, -1);
+
+        // page may be rotated
+        rotateAT = new AffineTransform();
+        int rotation = page.getRotation();
+        if (rotation != 0) {
+            PDRectangle mediaBox = page.getMediaBox();
+            switch (rotation) {
+                case 90:
+                    rotateAT.translate(mediaBox.getHeight(), 0);
+                    break;
+                case 270:
+                    rotateAT.translate(0, mediaBox.getWidth());
+                    break;
+                case 180:
+                    rotateAT.translate(mediaBox.getWidth(), mediaBox.getHeight());
+                    break;
+                default:
+                    break;
+            }
+            rotateAT.rotate(Math.toRadians(rotation));
+        }
+        // cropbox
+        transAT = AffineTransform.getTranslateInstance(-cropBox.getLowerLeftX(), cropBox.getLowerLeftY());
+
         ImageExtractor ext = new ImageExtractor();
         ext.processPage(page);
         imageBuffer = ext.buffer;
@@ -77,46 +118,122 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     float getPageHeight() { return getPage().getCropBox().getHeight(); }
 
-    void addText(TextPosition p) {
-        buffer.add(new Text(p));
-    }
-
     void addDraw(String op, float... values) {
         buffer.add(new Draw(op, values));
     }
 
-    void writeLine(String type, Object... values) throws IOException {
+    void writeLine(Object... values) throws IOException {
         List<String> l = new ArrayList<>();
         for (Object o : values) l.add(String.valueOf(o));
-        output.write(String.valueOf(pageIndex+1));
-        output.write("\t");
-        output.write(type);
-        output.write("\t");
-        output.write(String.join(" ", l));
+        output.write(String.join("\t", l));
         output.write("\n");
     }
 
-    void write() throws IOException {
-        for (Object obj : buffer) {
-            String type = "";
-            if (obj instanceof Text) type = "TEXT";
-            else if (obj instanceof Draw) type = "DRAW";
-            else if (obj instanceof Image) type = "IMAGE";
+    void writeText(List<Text> textBuffer) throws IOException {
+        if (textBuffer.isEmpty()) return;
+        List<String> l = new ArrayList<>();
+        for (Text t : textBuffer) l.add(t.unicode);
+        String unicode = String.join("", l);
 
-            if (type.equals("TEXT")) {
-                Text t = (Text)obj;
-                writeLine(type, t.value, t.x, t.y, t.w, t.h, t.fontSize, t.fontName);
+        l.clear();
+        for (Text t : textBuffer) l.add(String.valueOf(t.x));
+        String x = String.join(" ", l);
+
+        l.clear();
+        for (Text t : textBuffer) l.add(String.valueOf(t.w));
+        String w = String.join(" ", l);
+
+        try {
+            Text t0 = textBuffer.get(0);
+            writeLine(pageIndex+1, "TEXT", unicode, x, t0.y, w, t0.h);
+        }
+        catch (Exception e) { }
+        textBuffer.clear();
+    }
+
+    void writeText2(List<Text> textBuffer) throws IOException {
+        float averageW = 0;
+        for (Text t : textBuffer) averageW += t.bw;
+        averageW /= textBuffer.size();
+
+        Text prev = textBuffer.get(0);
+        for (Text t : textBuffer) {
+            float expectedX = prev.bx + prev.bw + averageW * 0.3f;
+            if (t.bx > expectedX) writeLine("[SPACE]");
+            writeLine(pageIndex+1, "TEXT", t.unicode, t.bx, t.by, t.bw, t.bh);
+            prev = t;
+        }
+        output.write("\n");
+    }
+
+    void write2() throws IOException {
+        int i = 0;
+        while (i < buffer.size()) {
+            Object obj = buffer.get(i);
+            if (obj instanceof Text) {
+                Text t0 = (Text)obj;
+                List<Text> textBuffer = new ArrayList<>();
+                while (i < buffer.size()) {
+                    obj = buffer.get(i);
+                    if (obj instanceof Text) {
+                        Text t = (Text)obj;
+                        if (t.by == t0.by && t.bh == t0.bh) textBuffer.add(t);
+                        else break;
+                        i++;
+                    }
+                    else break;
+                }
+                writeText2(textBuffer);
             }
-            else if (type.equals("DRAW")) {
+            else if (obj instanceof Draw) {
                 Draw d = (Draw)obj;
                 List<String> l = new ArrayList<>();
                 for (Object o : d.values) l.add(String.valueOf(o));
-                if (l.isEmpty()) writeLine(type, d.op);
-                else writeLine(type, d.op, String.join(" ", l));
+                if (l.isEmpty()) writeLine(pageIndex+1, "DRAW", d.op);
+                else writeLine(pageIndex+1, "DRAW", d.op, String.join(" ", l));
+                i++;
             }
-            else if (type.equals("IMAGE")) {
-                Image i = (Image)obj;
-                writeLine(type, i.x, i.y, i.w, i.h);
+            else if (obj instanceof Image) {
+                Image image = (Image)obj;
+                writeLine(pageIndex+1, "IMAGE", image.x, image.y, image.w, image.h);
+                i++;
+            }
+        }
+    }
+
+    void write() throws IOException {
+        List<Text> textBuffer = new ArrayList<>();
+        float averageW = 0;
+
+        for (int i = 0; i < buffer.size(); i++) {
+            Object obj = buffer.get(i);
+            if (obj instanceof Text) {
+                Text text = (Text)obj;
+                if (textBuffer.isEmpty()) averageW = text.bw;
+                else {
+                    Text prev = textBuffer.get(textBuffer.size()-1);
+                    float expectedX = prev.bx + prev.bw + averageW * 0.3f;
+                    boolean consistent = prev.by == text.by && prev.bh == text.bh;
+                    if (text.bx > expectedX || !consistent || i == buffer.size()-1) {
+                        writeText(textBuffer);
+                        averageW = 0;
+                    }
+                    else averageW = (averageW + text.bw) / 2;
+                }
+                textBuffer.add(text);
+            }
+            else if (obj instanceof Draw) {
+                writeText(textBuffer);
+                Draw d = (Draw)obj;
+                List<String> l = new ArrayList<>();
+                for (Object o : d.values) l.add(String.valueOf(o));
+                if (l.isEmpty()) writeLine(pageIndex+1, "DRAW", d.op);
+                else writeLine(pageIndex+1, "DRAW", d.op, String.join(" ", l));
+            }
+            else if (obj instanceof Image) {
+                writeText(textBuffer);
+                Image image = (Image)obj;
+                writeLine(pageIndex+1, "IMAGE", image.x, image.y, image.w, image.h);
             }
         }
     }
@@ -176,7 +293,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     @Override
     public void showFontGlyph(Matrix textRenderingMatrix, PDFont font, int code, String unicode, Vector displacement) throws IOException {
-        // from LegacyPDFStreamEngine.showGlyph
+        // taken from LegacyPDFStreamEngine.showGlyph
         PDGraphicsState state = this.getGraphicsState();
         Matrix ctm = state.getCurrentTransformationMatrix();
         float fontSize = state.getTextState().getFontSize();
@@ -231,7 +348,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         }
 
         float spaceWidthText = 0.0F;
-
         try {
             spaceWidthText = font.getSpaceWidth() * glyphSpaceToTextSpaceFactor;
         } catch (Throwable e) {
@@ -242,7 +358,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             spaceWidthText = font.getAverageFontWidth() * glyphSpaceToTextSpaceFactor;
             spaceWidthText *= 0.8F;
         }
-
         if (spaceWidthText == 0.0F) spaceWidthText = 1.0F;
 
         float spaceWidthDisplay = spaceWidthText * textRenderingMatrix.getScalingFactorX();
@@ -252,7 +367,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 char c = (char)code;
                 unicode = new String(new char[]{c});
             }
-            else unicode = "NO_UNICODE";
+            else unicode = "[NO_UNICODE]";
         }
         unicode = unicode.trim();
         if (unicode.isEmpty()) return;
@@ -266,57 +381,108 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             nextY -= this.pageSize.getLowerLeftY();
         }
 
-        TextPosition p = new TextPosition(pageRotation, pageSize.getWidth(), pageSize.getHeight(), translatedTextRenderingMatrix,
+        TextPosition text = new TextPosition(pageRotation, pageSize.getWidth(), pageSize.getHeight(), translatedTextRenderingMatrix,
                 nextX, nextY, Math.abs(dyDisplay), dxDisplay, Math.abs(spaceWidthDisplay),
                 unicode, new int[]{code}, font, fontSize, (int)(fontSize * textMatrix.getScalingFactorX()));
-        addText(p);
+
+        Shape shape1 = calculateGlyphBounds(textRenderingMatrix, font, code);
+        Rectangle2D.Double r1 = (Rectangle2D.Double)shape1.getBounds2D();
+        Shape shape2 = calculateGlyphBoundsFromText(text);
+        Rectangle2D.Double r2 = (Rectangle2D.Double)shape2.getBounds2D();
+        Text t = new Text(unicode, font, (float)r1.x, (float)r1.y, (float)r1.width, (float)r1.height,
+                (float)r2.x, (float)r2.y, (float)r2.width, (float)r2.height);
+        buffer.add(t);
     }
 
-    public class Text {
-        String value;
-        float x;
-        float y;
-        float w;
-        float h;
-        float fontSize;
-        String fontName;
+    // taken from writeString in DrawPrintTextLocations
+    Shape calculateGlyphBoundsFromText(TextPosition text) throws IOException {
+        // glyph space -> user space
+        // note: text.getTextMatrix() is *not* the Text Matrix, it's the Text Rendering Matrix
+        AffineTransform at = text.getTextMatrix().createAffineTransform();
 
-        public Text(TextPosition p) {
-            this.value = p.getUnicode();
-            this.x = p.getXDirAdj();
-            this.y = p.getYDirAdj();
-            this.w = p.getWidthDirAdj();
-            this.h = p.getHeightDir();
-            this.fontSize = p.getFontSize();
-            this.fontName = p.getFont().getName();
-            //PDFont font = p.getFont();
-            //PDFontDescriptor fontDesc = font.getFontDescriptor();
-            //float descent = fontDesc.getDescent() / 1000F;
+        // show rectangle with the real vertical bounds, based on the font bounding box y values
+        // usually, the height is identical to what you see when marking text in Adobe Reader
+        PDFont font = text.getFont();
+        BoundingBox bbox = font.getBoundingBox();
+
+        // advance width, bbox height (glyph space)
+        float xadvance = font.getWidth(text.getCharacterCodes()[0]); // todo: should iterate all chars
+        Rectangle2D.Float rect = new Rectangle2D.Float(0, bbox.getLowerLeftY(), xadvance, bbox.getHeight());
+
+        if (font instanceof PDType3Font) {
+            // bbox and font matrix are unscaled
+            at.concatenate(font.getFontMatrix().createAffineTransform());
         }
+        else {
+            // bbox and font matrix are already scaled to 1000
+            at.scale(1/1000f, 1/1000f);
+        }
+        Shape s = at.createTransformedShape(rect);
+        s = flipAT.createTransformedShape(s);
+        s = rotateAT.createTransformedShape(s);
+        return s;
     }
 
-    public class Draw {
-        String op;
-        float[] values;
-
-        public Draw(String op, float[] values) {
-            this.op = op;
-            this.values = values;
+    // taken from DrawPrintTextLocations.java
+    // this calculates the real (except for type 3 fonts) individual glyph bounds
+    Shape calculateGlyphBounds(Matrix textRenderingMatrix, PDFont font, int code) throws IOException {
+        GeneralPath path = null;
+        AffineTransform at = textRenderingMatrix.createAffineTransform();
+        at.concatenate(font.getFontMatrix().createAffineTransform());
+        if (font instanceof PDType3Font) {
+            // It is difficult to calculate the real individual glyph bounds for type 3 fonts
+            // because these are not vector fonts, the content stream could contain almost anything
+            // that is found in page content streams.
+            PDType3Font t3Font = (PDType3Font) font;
+            PDType3CharProc charProc = t3Font.getCharProc(code);
+            if (charProc != null) {
+                BoundingBox fontBBox = t3Font.getBoundingBox();
+                PDRectangle glyphBBox = charProc.getGlyphBBox();
+                if (glyphBBox != null) {
+                    // PDFBOX-3850: glyph bbox could be larger than the font bbox
+                    glyphBBox.setLowerLeftX(Math.max(fontBBox.getLowerLeftX(), glyphBBox.getLowerLeftX()));
+                    glyphBBox.setLowerLeftY(Math.max(fontBBox.getLowerLeftY(), glyphBBox.getLowerLeftY()));
+                    glyphBBox.setUpperRightX(Math.min(fontBBox.getUpperRightX(), glyphBBox.getUpperRightX()));
+                    glyphBBox.setUpperRightY(Math.min(fontBBox.getUpperRightY(), glyphBBox.getUpperRightY()));
+                    path = glyphBBox.toGeneralPath();
+                }
+            }
         }
-    }
+        else if (font instanceof PDVectorFont) {
+            PDVectorFont vectorFont = (PDVectorFont) font;
+            path = vectorFont.getPath(code);
 
-    public class Image {
-        float x;
-        float y;
-        float w;
-        float h;
-
-        public Image(float x, float y, float w, float h) {
-            this.x = x;
-            this.y = y;
-            this.w = w;
-            this.h = h;
+            if (font instanceof PDTrueTypeFont) {
+                PDTrueTypeFont ttFont = (PDTrueTypeFont) font;
+                int unitsPerEm = ttFont.getTrueTypeFont().getHeader().getUnitsPerEm();
+                at.scale(1000d / unitsPerEm, 1000d / unitsPerEm);
+            }
+            if (font instanceof PDType0Font) {
+                PDType0Font t0font = (PDType0Font) font;
+                if (t0font.getDescendantFont() instanceof PDCIDFontType2) {
+                    int unitsPerEm = ((PDCIDFontType2) t0font.getDescendantFont()).getTrueTypeFont().getHeader().getUnitsPerEm();
+                    at.scale(1000d / unitsPerEm, 1000d / unitsPerEm);
+                }
+            }
         }
+        else if (font instanceof PDSimpleFont) {
+            PDSimpleFont simpleFont = (PDSimpleFont) font;
+
+            // these two lines do not always work, e.g. for the TT fonts in file 032431.pdf
+            // which is why PDVectorFont is tried first.
+            String name = simpleFont.getEncoding().getName(code);
+            path = simpleFont.getPath(name);
+        }
+        else {
+            // shouldn't happen, please open issue in JIRA
+            System.out.println("Unknown font class: " + font.getClass());
+        }
+        if (path == null) return null;
+        Shape s = at.createTransformedShape(path.getBounds2D());
+        s = flipAT.createTransformedShape(s);
+        s = rotateAT.createTransformedShape(s);
+        s = transAT.createTransformedShape(s);
+        return s;
     }
 
     public class ImageExtractor extends PDFStreamEngine {
