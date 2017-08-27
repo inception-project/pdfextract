@@ -43,10 +43,10 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         PDDocument doc = PDDocument.load(p.toFile());
         //try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
         try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
-            for (int i = 0; i < 1; i++) {
-                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i, w);
+            for (int i = 5; i < 6; i++) {
+                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i+1, w);
                 ext.processPage(doc.getPage(i));
-                ext.write2();
+                ext.write();
             }
         }
     }
@@ -130,7 +130,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     }
 
     void writeText(List<Text> textBuffer) throws IOException {
-        if (textBuffer.isEmpty()) return;
         List<String> l = new ArrayList<>();
         for (Text t : textBuffer) l.add(t.unicode);
         String unicode = String.join("", l);
@@ -143,98 +142,68 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         for (Text t : textBuffer) l.add(String.valueOf(t.w));
         String w = String.join(" ", l);
 
-        try {
-            Text t0 = textBuffer.get(0);
-            writeLine(pageIndex+1, "TEXT", unicode, x, t0.y, w, t0.h);
-        }
-        catch (Exception e) { }
-        textBuffer.clear();
+        Text t0 = textBuffer.get(0);
+        writeLine(pageIndex, "TEXT", unicode, x, t0.y, w, t0.h);
     }
 
     void writeText2(List<Text> textBuffer) throws IOException {
-        float averageW = 0;
-        for (Text t : textBuffer) averageW += t.bw;
-        averageW /= textBuffer.size();
-
-        Text prev = textBuffer.get(0);
         for (Text t : textBuffer) {
-            float expectedX = prev.bx + prev.bw + averageW * 0.3f;
-            if (t.bx > expectedX) writeLine("[SPACE]");
-            writeLine(pageIndex+1, "TEXT", t.unicode, t.bx, t.by, t.bw, t.bh);
-            prev = t;
+            writeLine(pageIndex, "TEXT", t.unicode, t.bx, t.by, t.bw, t.bh, t.x, t.y, t.w, t.h);
         }
         output.write("\n");
     }
 
-    void write2() throws IOException {
+    void writeDraw(List<Draw> drawBuffer) throws IOException {
+        for (Draw d : drawBuffer) {
+            writeLine(pageIndex, "DRAW", d.op);
+        }
+        output.write("\n");
+    }
+
+    void write() throws IOException {
         int i = 0;
         while (i < buffer.size()) {
             Object obj = buffer.get(i);
             if (obj instanceof Text) {
-                Text t0 = (Text)obj;
+                Text prev = (Text)obj;
+                float totalW = 0;
                 List<Text> textBuffer = new ArrayList<>();
                 while (i < buffer.size()) {
                     obj = buffer.get(i);
-                    if (obj instanceof Text) {
-                        Text t = (Text)obj;
-                        if (t.by == t0.by && t.bh == t0.bh) textBuffer.add(t);
+                    if (obj instanceof Text == false) break;
+                    Text curr = (Text)obj;
+                    if (textBuffer.isEmpty()) textBuffer.add(curr);
+                    else {
+                        float expectedX = prev.bx + prev.bw + totalW / textBuffer.size() * 0.3f;
+                        if (curr.by == prev.by && curr.bh == prev.bh && curr.bx <= expectedX) textBuffer.add(curr);
                         else break;
-                        i++;
                     }
-                    else break;
+                    totalW += curr.bw;
+                    prev = curr;
+                    i++;
                 }
-                writeText2(textBuffer);
+                writeText(textBuffer);
             }
             else if (obj instanceof Draw) {
-                Draw d = (Draw)obj;
-                List<String> l = new ArrayList<>();
-                for (Object o : d.values) l.add(String.valueOf(o));
-                if (l.isEmpty()) writeLine(pageIndex+1, "DRAW", d.op);
-                else writeLine(pageIndex+1, "DRAW", d.op, String.join(" ", l));
-                i++;
+                List<Draw> drawBuffer = new ArrayList<>();
+                while (i < buffer.size()) {
+                    obj = buffer.get(i);
+                    if (obj instanceof Draw == false) break;
+                    Draw d = (Draw)obj;
+                    drawBuffer.add(d);
+                    i++;
+                    if (d.op.endsWith("_PATH")) {
+                        writeDraw(drawBuffer);
+                        break;
+                    }
+                }
             }
             else if (obj instanceof Image) {
                 Image image = (Image)obj;
-                writeLine(pageIndex+1, "IMAGE", image.x, image.y, image.w, image.h);
+                writeLine(pageIndex, "IMAGE", image.x, image.y, image.w, image.h);
                 i++;
             }
-        }
-    }
-
-    void write() throws IOException {
-        List<Text> textBuffer = new ArrayList<>();
-        float averageW = 0;
-
-        for (int i = 0; i < buffer.size(); i++) {
-            Object obj = buffer.get(i);
-            if (obj instanceof Text) {
-                Text text = (Text)obj;
-                if (textBuffer.isEmpty()) averageW = text.bw;
-                else {
-                    Text prev = textBuffer.get(textBuffer.size()-1);
-                    float expectedX = prev.bx + prev.bw + averageW * 0.3f;
-                    boolean consistent = prev.by == text.by && prev.bh == text.bh;
-                    if (text.bx > expectedX || !consistent || i == buffer.size()-1) {
-                        writeText(textBuffer);
-                        averageW = 0;
-                    }
-                    else averageW = (averageW + text.bw) / 2;
-                }
-                textBuffer.add(text);
-            }
-            else if (obj instanceof Draw) {
-                writeText(textBuffer);
-                Draw d = (Draw)obj;
-                List<String> l = new ArrayList<>();
-                for (Object o : d.values) l.add(String.valueOf(o));
-                if (l.isEmpty()) writeLine(pageIndex+1, "DRAW", d.op);
-                else writeLine(pageIndex+1, "DRAW", d.op, String.join(" ", l));
-            }
-            else if (obj instanceof Image) {
-                writeText(textBuffer);
-                Image image = (Image)obj;
-                writeLine(pageIndex+1, "IMAGE", image.x, image.y, image.w, image.h);
-            }
+            else i++;
         }
     }
 
