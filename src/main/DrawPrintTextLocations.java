@@ -91,7 +91,7 @@ public class DrawPrintTextLocations extends PDFTextStripper {
             DrawPrintTextLocations stripper = new DrawPrintTextLocations(document, args[0]);
             stripper.setSortByPosition(true);
 
-            for (int page = 0; page < 1; ++page) {
+            for (int page = 0; page < document.getNumberOfPages(); ++page) {
                 stripper.stripPage(page);
             }
         }
