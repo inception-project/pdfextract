@@ -8,7 +8,7 @@ Extract text, draw and image from PDF.
 java -classpath pdfextract.jar PDFExtractor <pdf | directory>
 ```
 
-<p align="center"><img src="https://github.com/hshindo/pdfextract/blob/master/PDFExtractor.png" width="150"></p>
+<p align="center"><img src="https://github.com/paperai/pdfextract/blob/master/PDFExtractor.png" width="150"></p>
 
 ### Output Format
 1. Page number
