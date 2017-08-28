@@ -112,7 +112,7 @@ public class DrawPrintTextLocations extends PDFTextStripper {
             cyanShape = rotateAT.createTransformedShape(cyanShape);
             cyanShape = transAT.createTransformedShape(cyanShape);
 
-            g2d.setColor(Color.CYAN);
+            g2d.setColor(Color.red);
             g2d.draw(cyanShape);
         }
     }
