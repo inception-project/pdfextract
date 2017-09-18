@@ -9,12 +9,12 @@ java -classpath pdfextract.jar PDFExtractor <pdf filename or directory name> <op
 ```
 
 ### Options
-* -text: extracts texts
-  * -bounding: extracts bounding coordinates
-  * -glyph: extracts glyph coordinates
-* -fontName: extracts fontName
-* -draw: extracts draws
-* -image: extracts images
+* `-text`: extracts texts
+  * `-bounding`: extracts bounding coordinates
+  * `-glyph`: extracts glyph coordinates
+* `-fontName`: extracts fontName
+* `-draw`: extracts draws
+* `-image`: extracts images
 
 For example,
 ```
