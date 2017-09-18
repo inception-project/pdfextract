@@ -3,9 +3,9 @@ PDF extractor using PDFBox.
 Download: [pdfextract.jar](https://cl.naist.jp/~shindo/pdfextract.jar)
 
 ## PDFExtractor
-Extract text, draw and image from PDF.
+Extract texts, draws and images from PDF.
 ```
-java -classpath pdfextract.jar PDFExtractor <pdf filename or directory name> <options...>
+java -classpath pdfextract.jar PDFExtractor <file or directory> <options...>
 ```
 
 ### Options
