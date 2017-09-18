@@ -5,26 +5,56 @@ Download: [pdfextract.jar](https://cl.naist.jp/~shindo/pdfextract.jar)
 ## PDFExtractor
 Extract text, draw and image from PDF.
 ```
-java -classpath pdfextract.jar PDFExtractor <pdf | directory>
+java -classpath pdfextract.jar PDFExtractor <pdf filename or directory name> <options...>
 ```
+
+### Options
+* -text: extracts texts
+  * -bounding: extracts bounding coordinates
+  * -glyph: extracts glyph coordinates
+* -fontName: extracts fontName
+* -draw: extracts draws
+* -image: extracts images
+
+For example,
+```
+java -classpath pdfextract.jar PDFExtractor xxx.pdf -text -bounding
+```
+extracts only texts with bounding coordinates from `xxx.pdf`.
 
 <p align="center"><img src="https://github.com/paperai/pdfextract/blob/master/PDFExtractor.png" width="1200"></p>
 
-### Output Format
-1. Page number
-1. TEXT, DRAW, or IMAGE
-1. Character
-1. bounding x coordinate
-1. bounding y coordinate
-1. bounding width
-1. bounding height
-1. glyph x coordinate
-1. glyph y coordinate
-1. glyph width
-1. glyph height
-1. Font name
+In the figure, blue square indicates bounding coordinates, and red square indicates glyph coordinates.
 
-where blue square indicates bounding coordinates, and red square indicates glyph coordinates.
+### Output Format
+Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
+
+#### Text
+1. Page number
+1. "TEXT"
+1. Character
+1. [Optional] bounding x coordinate
+1. [Optional] bounding y coordinate
+1. [Optional] bounding width
+1. [Optional] bounding height
+1. [Optional] glyph x coordinate
+1. [Optional] glyph y coordinate
+1. [Optional] glyph width
+1. [Optional] glyph height
+1. [Optional] Font name
+
+#### Draw
+1. Page number
+1. "DRAW"
+1. Operation ("LINE_TO", "CURVE_TO", etc.)
+
+#### Image
+1. Page number
+1. "IMAGE"
+1. x coordinate
+1. y coordinate
+1. width
+1. height
 
 ### Example
 ```
