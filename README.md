@@ -1,5 +1,6 @@
 # pdfextract
 PDF extractor using PDFBox.
+The jar file can be found at [releases](releases).
 
 ## PDFExtractor
 Extract texts, draws and images from PDF.
