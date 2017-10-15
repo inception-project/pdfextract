@@ -1,6 +1,6 @@
 # pdfextract
 PDF extractor using PDFBox.
-The jar file can be found at [releases](releases).
+The jar file can be found at [releases](https://github.com/paperai/pdfextract/releases).
 
 ## PDFExtractor
 Extract texts, draws and images from PDF.
