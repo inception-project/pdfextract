@@ -1,6 +1,5 @@
 # pdfextract
 PDF extractor using PDFBox.
-Download: [pdfextract.jar](https://cl.naist.jp/~shindo/pdfextract.jar)
 
 ## PDFExtractor
 Extract texts, draws and images from PDF.
