@@ -378,10 +378,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         unicode = font.toUnicode(code, this.glyphList);
         if (unicode == null) unicode = "[NO_UNICODE]";
 
-        // In some PDFs, whitespace is included as a character. We skip it.
-        unicode = unicode.trim();
-        if (unicode.isEmpty()) return;
-
         Matrix translatedTextRenderingMatrix;
         if (this.translateMatrix == null) {
             translatedTextRenderingMatrix = textRenderingMatrix;
