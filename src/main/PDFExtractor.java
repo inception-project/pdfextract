@@ -376,13 +376,9 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
         float spaceWidthDisplay = spaceWidthText * textRenderingMatrix.getScalingFactorX();
         unicode = font.toUnicode(code, this.glyphList);
-        if (unicode == null) {
-            if (font instanceof PDSimpleFont) {
-                char c = (char)code;
-                unicode = new String(new char[]{c});
-            }
-            else unicode = "[NO_UNICODE]";
-        }
+        if (unicode == null) unicode = "[NO_UNICODE]";
+
+        // In some PDFs, whitespace is included as a character. We skip it.
         unicode = unicode.trim();
         if (unicode.isEmpty()) return;
 
@@ -400,9 +396,9 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 unicode, new int[]{code}, font, fontSize, (int)(fontSize * textMatrix.getScalingFactorX()));
 
         Shape boundingShape = calculateBounds(text);
-        Rectangle2D.Double b = (Rectangle2D.Double)boundingShape.getBounds2D();
+        Rectangle2D.Double b = (Rectangle2D.Double)boundingShape.getBounds2D(); // bounding coordinates
         Shape glyphShape = calculateGlyphBounds(textRenderingMatrix, font, code);
-        Rectangle2D.Double g = (Rectangle2D.Double)glyphShape.getBounds2D();
+        Rectangle2D.Double g = (Rectangle2D.Double)glyphShape.getBounds2D(); // glyph coordinates
         Text t = new Text(unicode, font, (float)b.x, (float)b.y, (float)b.width, (float)b.height,
                 (float)g.x, (float)g.y, (float)g.width, (float)g.height);
         buffer.add(t);
