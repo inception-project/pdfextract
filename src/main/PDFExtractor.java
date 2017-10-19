@@ -260,8 +260,9 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     @Override
     public void appendRectangle(Point2D p0, Point2D p1, Point2D p2, Point2D p3) throws IOException {
-        addDraw("RECTANGLE", (float)p0.getX(), (float)p0.getY(), (float)p1.getX(), (float)p1.getY(),
-                (float)p2.getX(), (float)p2.getY(), (float)p3.getX(), (float)p3.getY());
+        float h = getPageHeight();
+        addDraw("RECTANGLE", (float)p0.getX(), h - (float)p0.getY(), (float)p1.getX(), h - (float)p1.getY(),
+                (float)p2.getX(), h - (float)p2.getY(), (float)p3.getX(), h - (float)p3.getY());
     }
 
     @Override
