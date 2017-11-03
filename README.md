@@ -56,7 +56,7 @@ Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
 1. width
 1. height
 
-### Example
+### Output Example
 ```
 1	TEXT	P	106.4301	754.63226	5.478471	10.705882	106.4301	757.06213	5.424672	5.8550596	LMQTGC+NimbusRomNo9L-ReguItal
 1	TEXT	r	111.90857	754.63226	3.4879298	10.705882	112.31206	758.963	3.290669	3.9541826	LMQTGC+NimbusRomNo9L-ReguItal
@@ -76,4 +76,15 @@ Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
 1	TEXT	t	162.30872	754.63226	2.4926593	10.705882	162.64047	758.02155	2.3222978	4.994285	LMQTGC+NimbusRomNo9L-ReguItal
 1	TEXT	h	164.80138	754.63226	4.4832	10.705882	164.97174	756.79315	4.1155777	6.204749	LMQTGC+NimbusRomNo9L-ReguItal
 1	TEXT	e	169.28458	754.63226	3.981082	10.705882	169.56253	758.963	3.4161987	4.052813	LMQTGC+NimbusRomNo9L-ReguItal
+```
+
+## ImageExtractor
+Extract images from PDF as PNG format.
+```
+java -classpath pdfextract.jar ImageExtractor <file or directory> -dpi <dpi>
+```
+
+For example,
+```
+java -classpath pdfextract.jar ImageExtractor xxx.pdf -dpi 300
 ```

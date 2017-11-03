@@ -1,29 +1,18 @@
-import javafx.beans.binding.ObjectExpression;
 import org.apache.fontbox.ttf.TrueTypeFont;
 import org.apache.fontbox.util.BoundingBox;
 import org.apache.pdfbox.contentstream.PDFGraphicsStreamEngine;
-import org.apache.pdfbox.contentstream.PDFStreamEngine;
-import org.apache.pdfbox.contentstream.operator.DrawObject;
-import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.contentstream.operator.state.*;
 import org.apache.pdfbox.cos.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.*;
 import org.apache.pdfbox.pdmodel.font.encoding.GlyphList;
-import org.apache.pdfbox.pdmodel.graphics.PDXObject;
-import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImage;
-import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.state.PDGraphicsState;
-import org.apache.pdfbox.pdmodel.interactive.pagenavigation.PDThreadBead;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 import org.apache.pdfbox.util.Vector;
 
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.GeneralPath;
@@ -490,46 +479,5 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         s = rotateAT.createTransformedShape(s);
         s = transAT.createTransformedShape(s);
         return s;
-    }
-
-    public class ImageExtractor extends PDFStreamEngine {
-
-        List<Image> buffer = new ArrayList<>();
-
-        public ImageExtractor() throws IOException {
-            addOperator(new Concatenate());
-            addOperator(new DrawObject());
-            addOperator(new SetGraphicsStateParameters());
-            addOperator(new Save());
-            addOperator(new Restore());
-            addOperator(new SetMatrix());
-        }
-
-        @Override
-        protected void processOperator(Operator operator, List<COSBase> operands) throws IOException {
-            String operation = operator.getName();
-            if("Do".equals(operation)) {
-                COSName objectName = (COSName)operands.get(0);
-                PDXObject xobject = getResources().getXObject(objectName);
-
-                if (xobject instanceof PDImageXObject) {
-                    PDImageXObject image = (PDImageXObject)xobject;
-                    Matrix ctmNew = getGraphicsState().getCurrentTransformationMatrix();
-                    PDRectangle pageRect = this.getCurrentPage().getCropBox();
-                    float w = ctmNew.getScalingFactorX();
-                    float h = ctmNew.getScalingFactorY();
-                    float x = ctmNew.getTranslateX();
-                    float y = pageRect.getHeight() - ctmNew.getTranslateY() - h;
-                    buffer.add(new Image(x, y, w, h));
-                }
-                else if(xobject instanceof PDFormXObject) {
-                    PDFormXObject form = (PDFormXObject)xobject;
-                    showForm(form);
-                }
-            }
-            else {
-                super.processOperator(operator, operands);
-            }
-        }
     }
 }
