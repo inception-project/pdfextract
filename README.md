@@ -81,10 +81,10 @@ Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
 ## ImageExtractor
 Extract images from PDF as PNG format.
 ```
-java -classpath pdfextract.jar ImageExtractor <file or directory> -dpi <dpi>
+java -classpath pdfextract.jar ImageExtractor <file or directory> -dpi <dpi> -o <output directory>
 ```
 
 For example,
 ```
-java -classpath pdfextract.jar ImageExtractor xxx.pdf -dpi 300
+java -classpath pdfextract.jar ImageExtractor xxx.pdf -dpi 300 -o /work
 ```

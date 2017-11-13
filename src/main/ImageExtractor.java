@@ -28,7 +28,7 @@ public class ImageExtractor extends PDFStreamEngine {
         HashMap<String,String> map = new HashMap<>();
         for (int i = 1; i < args.length; i+=2) map.put(args[i], args[i+1]);
         String o = map.containsKey("-o") ? map.get("-o") : "";
-        String outDir = o.isEmpty() ? inFile.getParent() : o;
+        String outDir = o.isEmpty() ? inFile.getParent() : (new File(o)).getAbsolutePath();
         int dpi = map.containsKey("-dpi") ? Integer.parseInt(map.get("-dpi")) : 300;
 
         if (inFile.isDirectory()) {
