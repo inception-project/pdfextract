@@ -26,14 +26,16 @@ import java.util.List;
 
 public class ImageExtractor extends PDFStreamEngine {
 
-    static int dpi = 500;
+    static int dpi = 300;
     static int POINTS_IN_INCH = 72;
 
     public static void main(String[] args) throws IOException {
+        String outPath = "";
         for (int i = 1; i < args.length; i+=2) {
             String key = args[i];
             String val = args[i+1];
             if (key.equals("-dpi")) dpi = Integer.parseInt(val);
+            if (key.equals("-outpath")) outPath = val;
         }
 
         Path path = Paths.get(args[0]);
