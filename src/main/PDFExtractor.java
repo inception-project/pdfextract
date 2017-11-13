@@ -86,7 +86,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     PDRectangle pageSize;
     Matrix translateMatrix;
     final GlyphList glyphList;
-    List<Image> imageBuffer;
+    List<ImagePosition> imageBuffer;
     List<Object> buffer = new ArrayList<>();
 
     AffineTransform flipAT;
@@ -225,8 +225,8 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                     }
                 }
             }
-            else if (obj instanceof Image) {
-                Image image = (Image)obj;
+            else if (obj instanceof ImagePosition) {
+                ImagePosition image = (ImagePosition)obj;
                 output.write(String.valueOf(pageIndex));
                 output.write("\t" + String.valueOf(image.x));
                 output.write("\t" + String.valueOf(image.y));
@@ -242,7 +242,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     @Override
     public void drawImage(PDImage pdImage) throws IOException {
         if (!useImage) return;
-        Image i = imageBuffer.get(0);
+        ImagePosition i = imageBuffer.get(0);
         buffer.add(i);
         imageBuffer.remove(0);
     }

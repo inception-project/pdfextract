@@ -66,7 +66,7 @@ public class ImageExtractor extends PDFStreamEngine {
             for (int pageIndex = 0; pageIndex < doc.getNumberOfPages(); pageIndex++) {
                 ImageExtractor ext = new ImageExtractor();
                 ext.processPage(doc.getPage(pageIndex));
-                for (Image image : ext.buffer) {
+                for (ImagePosition image : ext.buffer) {
                     Rectangle2D region = new Rectangle2D.Float(image.x, image.y, image.w, image.h);
                     RenderedImage renderedImage = ext.renderRect(renderer, pageIndex, region);
                     String fileName = path.getFileName() + "_" + String.valueOf(count) + ".png";
@@ -80,7 +80,7 @@ public class ImageExtractor extends PDFStreamEngine {
         }
     }
 
-    List<Image> buffer = new ArrayList<>();
+    List<ImagePosition> buffer = new ArrayList<>();
 
     public ImageExtractor() throws IOException {
         addOperator(new Concatenate());
@@ -106,7 +106,7 @@ public class ImageExtractor extends PDFStreamEngine {
                 float h = ctmNew.getScalingFactorY();
                 float x = ctmNew.getTranslateX();
                 float y = pageRect.getHeight() - ctmNew.getTranslateY() - h;
-                buffer.add(new Image(x, y, w, h));
+                buffer.add(new ImagePosition(x, y, w, h));
             }
             else if(xobject instanceof PDFormXObject) {
                 PDFormXObject form = (PDFormXObject)xobject;
