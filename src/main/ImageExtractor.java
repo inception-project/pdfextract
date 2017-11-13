@@ -5,73 +5,63 @@ import org.apache.pdfbox.contentstream.operator.state.*;
 import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.PDXObject;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.util.Matrix;
 
 import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Rectangle2D;
-import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class ImageExtractor extends PDFStreamEngine {
 
-    static int dpi = 300;
-    static int POINTS_IN_INCH = 72;
-
     public static void main(String[] args) throws IOException {
-        String outPath = "";
-        for (int i = 1; i < args.length; i+=2) {
-            String key = args[i];
-            String val = args[i+1];
-            if (key.equals("-dpi")) dpi = Integer.parseInt(val);
-            if (key.equals("-outpath")) outPath = val;
-        }
+        File inFile = new File(args[0]);
+        HashMap<String,String> map = new HashMap<>();
+        for (int i = 1; i < args.length; i+=2) map.put(args[i], args[i+1]);
+        String o = map.containsKey("-o") ? map.get("-o") : "";
+        String outDir = o.isEmpty() ? inFile.getParent() : o;
+        int dpi = map.containsKey("-dpi") ? Integer.parseInt(map.get("-dpi")) : 300;
 
-        Path path = Paths.get(args[0]);
-        if (Files.isDirectory(path)) {
+        if (inFile.isDirectory()) {
             FileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     if (file.toString().endsWith(".pdf")) {
                         try {
-                            processFile(file);
+                            processFile(file.toFile(), dpi, outDir);
                         }
                         catch (Exception e) { }
                     }
                     return FileVisitResult.CONTINUE;
                 }
             };
-            Files.walkFileTree(path, visitor);
+            Files.walkFileTree(inFile.toPath(), visitor);
         } else {
-            processFile(path);
+            processFile(inFile, dpi, outDir);
         }
     }
 
-    static void processFile(Path path) throws IOException {
-        PDDocument doc = PDDocument.load(path.toFile());
+    static void processFile(File inFile, int dpi, String outDir) throws IOException {
+        PDDocument doc = PDDocument.load(inFile);
+        String baseName = inFile.getName().substring(0, inFile.getName().lastIndexOf("."));
         try {
-            PDFRenderer renderer = new PDFRenderer(doc);
+            RegionExtractor regionExt = new RegionExtractor(doc, dpi);
             int count = 1;
             for (int pageIndex = 0; pageIndex < doc.getNumberOfPages(); pageIndex++) {
-                ImageExtractor ext = new ImageExtractor();
-                ext.processPage(doc.getPage(pageIndex));
-                for (ImagePosition image : ext.buffer) {
-                    Rectangle2D region = new Rectangle2D.Float(image.x, image.y, image.w, image.h);
-                    RenderedImage renderedImage = ext.renderRect(renderer, pageIndex, region);
-                    String fileName = path.getFileName() + "_" + String.valueOf(count) + ".png";
-                    ImageIO.write(renderedImage, "png", new File(fileName));
-                    System.out.println(fileName + " is saved.");
+                for (ImageOperator op : ImageExtractor.extract(doc.getPage(pageIndex))) {
+                    RenderedImage image = regionExt.extract(pageIndex, op.x, op.y, op.w, op.h);
+                    String outFileName = baseName + "_" + String.valueOf(count) + ".png";
+                    ImageIO.write(image, "png", new File(outDir, outFileName));
+                    System.out.println(outFileName + " is saved.");
                     count++;
                 }
             }
@@ -80,7 +70,13 @@ public class ImageExtractor extends PDFStreamEngine {
         }
     }
 
-    List<ImagePosition> buffer = new ArrayList<>();
+    static List<ImageOperator> extract(PDPage page) throws IOException {
+        ImageExtractor ext = new ImageExtractor();
+        ext.processPage(page);
+        return ext.buffer;
+    }
+
+    List<ImageOperator> buffer = new ArrayList<>();
 
     public ImageExtractor() throws IOException {
         addOperator(new Concatenate());
@@ -106,7 +102,7 @@ public class ImageExtractor extends PDFStreamEngine {
                 float h = ctmNew.getScalingFactorY();
                 float x = ctmNew.getTranslateX();
                 float y = pageRect.getHeight() - ctmNew.getTranslateY() - h;
-                buffer.add(new ImagePosition(x, y, w, h));
+                buffer.add(new ImageOperator(x, y, w, h));
             }
             else if(xobject instanceof PDFormXObject) {
                 PDFormXObject form = (PDFormXObject)xobject;
@@ -116,31 +112,5 @@ public class ImageExtractor extends PDFStreamEngine {
         else {
             super.processOperator(operator, operands);
         }
-    }
-
-    private RenderedImage renderRect(PDFRenderer renderer, int pageIndex, Rectangle2D rect) throws IOException {
-        BufferedImage image = createImage(rect);
-        Graphics2D graphics = createGraphics(image, rect);
-        renderer.renderPageToGraphics(pageIndex, graphics);
-        graphics.dispose();
-        return image;
-    }
-
-    private BufferedImage createImage(Rectangle2D rect) {
-        double scale = dpi / POINTS_IN_INCH;
-        double bitmapWidth  = rect.getWidth()  * scale;
-        double bitmapHeight = rect.getHeight() * scale;
-        return new BufferedImage((int)bitmapWidth, (int)bitmapHeight, BufferedImage.TYPE_INT_RGB);
-    }
-
-    private Graphics2D createGraphics(BufferedImage image, Rectangle2D rect) {
-        double scale = dpi / POINTS_IN_INCH;
-        AffineTransform transform = AffineTransform.getScaleInstance(scale, scale);
-        transform.concatenate(AffineTransform.getTranslateInstance(-rect.getX(), -rect.getY()));
-
-        Graphics2D graphics = image.createGraphics();
-        graphics.setBackground(Color.WHITE);
-        graphics.setTransform(transform);
-        return graphics;
     }
 }

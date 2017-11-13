@@ -86,7 +86,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     PDRectangle pageSize;
     Matrix translateMatrix;
     final GlyphList glyphList;
-    List<ImagePosition> imageBuffer;
+    List<ImageOperator> imageBuffer;
     List<Object> buffer = new ArrayList<>();
 
     AffineTransform flipAT;
@@ -148,16 +148,16 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     float getPageHeight() { return getPage().getCropBox().getHeight(); }
 
     void addDraw(String op, float... values) {
-        if (useDraw) buffer.add(new Draw(op, values));
+        if (useDraw) buffer.add(new DrawOperator(op, values));
     }
 
-    void writeText(List<Text> textBuffer) throws IOException {
+    void writeText(List<TextOperator> textBuffer) throws IOException {
         float averageW = 0;
-        for (Text t : textBuffer) averageW += t.bw;
+        for (TextOperator t : textBuffer) averageW += t.bw;
         averageW /= textBuffer.size();
 
-        Text prev = textBuffer.get(0);
-        for (Text curr : textBuffer) {
+        TextOperator prev = textBuffer.get(0);
+        for (TextOperator curr : textBuffer) {
             float expectedX = prev.bx + prev.bw + averageW * 0.3f;
             if (curr.bx > expectedX) output.write("\n");
             output.write(String.valueOf(pageIndex));
@@ -183,11 +183,11 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         output.write("\n");
     }
 
-    void writeDraw(List<Draw> drawBuffer) throws IOException {
-        for (Draw d : drawBuffer) {
+    void writeDraw(List<DrawOperator> drawBuffer) throws IOException {
+        for (DrawOperator d : drawBuffer) {
             output.write(String.valueOf(pageIndex));
             output.write("\tDRAW");
-            output.write("\t" + String.valueOf(d.op));
+            output.write("\t" + String.valueOf(d.type));
             for (Float f : d.values)  output.write("\t" + String.valueOf(f));
             output.write("\n");
         }
@@ -198,35 +198,35 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         int i = 0;
         while (i < buffer.size()) {
             Object obj = buffer.get(i);
-            if (obj instanceof Text) {
-                Text t0 = (Text)obj;
-                List<Text> textBuffer = new ArrayList<>();
+            if (obj instanceof TextOperator) {
+                TextOperator t0 = (TextOperator)obj;
+                List<TextOperator> textBuffer = new ArrayList<>();
                 while (i < buffer.size()) {
                     obj = buffer.get(i);
-                    if (obj instanceof Text == false) break;
-                    Text t = (Text)obj;
+                    if (obj instanceof TextOperator == false) break;
+                    TextOperator t = (TextOperator)obj;
                     if (t.by != t0.by || t.bh != t0.bh) break;
                     textBuffer.add(t);
                     i++;
                 }
                 writeText(textBuffer);
             }
-            else if (obj instanceof Draw) {
-                List<Draw> drawBuffer = new ArrayList<>();
+            else if (obj instanceof DrawOperator) {
+                List<DrawOperator> drawBuffer = new ArrayList<>();
                 while (i < buffer.size()) {
                     obj = buffer.get(i);
-                    if (obj instanceof Draw == false) break;
-                    Draw d = (Draw)obj;
+                    if (obj instanceof DrawOperator == false) break;
+                    DrawOperator d = (DrawOperator)obj;
                     drawBuffer.add(d);
                     i++;
-                    if (d.op.endsWith("_PATH")) {
+                    if (d.type.endsWith("_PATH")) {
                         writeDraw(drawBuffer);
                         break;
                     }
                 }
             }
-            else if (obj instanceof ImagePosition) {
-                ImagePosition image = (ImagePosition)obj;
+            else if (obj instanceof ImageOperator) {
+                ImageOperator image = (ImageOperator)obj;
                 output.write(String.valueOf(pageIndex));
                 output.write("\t" + String.valueOf(image.x));
                 output.write("\t" + String.valueOf(image.y));
@@ -242,7 +242,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     @Override
     public void drawImage(PDImage pdImage) throws IOException {
         if (!useImage) return;
-        ImagePosition i = imageBuffer.get(0);
+        ImageOperator i = imageBuffer.get(0);
         buffer.add(i);
         imageBuffer.remove(0);
     }
@@ -385,7 +385,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         Rectangle2D.Double b = (Rectangle2D.Double)boundingShape.getBounds2D(); // bounding coordinates
         Shape glyphShape = calculateGlyphBounds(textRenderingMatrix, font, code);
         Rectangle2D.Double g = (Rectangle2D.Double)glyphShape.getBounds2D(); // glyph coordinates
-        Text t = new Text(unicode, font, (float)b.x, (float)b.y, (float)b.width, (float)b.height,
+        TextOperator t = new TextOperator(unicode, font, (float)b.x, (float)b.y, (float)b.width, (float)b.height,
                 (float)g.x, (float)g.y, (float)g.width, (float)g.height);
         buffer.add(t);
     }
