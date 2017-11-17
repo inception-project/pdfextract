@@ -72,16 +72,19 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     static void processFile(Path path, Writer w) throws IOException {
         try (PDDocument doc = PDDocument.load(path.toFile())) {
-            for (int i = 0; i < doc.getNumberOfPages(); i++) {
-                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
+            int lineID = 0;
+            for (int i = 0; i < 4; i++) {
+                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, lineID);
                 ext.processPage(doc.getPage(i));
                 ext.write();
+                lineID = ext.lineID;
             }
         }
     }
 
     Writer output;
     int pageIndex;
+    int lineID;
     int pageRotation;
     PDRectangle pageSize;
     Matrix translateMatrix;
@@ -93,10 +96,11 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     AffineTransform rotateAT;
     AffineTransform transAT;
 
-    public PDFExtractor(PDPage page, int pageIndex, Writer output) throws IOException {
+    public PDFExtractor(PDPage page, int pageIndex, Writer output, int lineID) throws IOException {
         super(page);
         this.pageIndex = pageIndex;
         this.output = output;
+        this.lineID = lineID;
 
         String path = "org/apache/pdfbox/resources/glyphlist/additional.txt";
         InputStream input = GlyphList.class.getClassLoader().getResourceAsStream(path);
@@ -160,6 +164,9 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         for (TextOperator curr : textBuffer) {
             float expectedX = prev.bx + prev.bw + averageW * 0.3f;
             if (curr.bx > expectedX) output.write("\n");
+            lineID += 1;
+            output.write(String.valueOf(lineID));
+            output.write("\t");
             output.write(String.valueOf(pageIndex));
             output.write("\tTEXT");
             output.write("\t" + curr.unicode);
@@ -185,6 +192,9 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     void writeDraw(List<DrawOperator> drawBuffer) throws IOException {
         for (DrawOperator d : drawBuffer) {
+            lineID += 1;
+            output.write(String.valueOf(lineID));
+            output.write("\t");
             output.write(String.valueOf(pageIndex));
             output.write("\tDRAW");
             output.write("\t" + String.valueOf(d.type));
@@ -227,12 +237,16 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             }
             else if (obj instanceof ImageOperator) {
                 ImageOperator image = (ImageOperator)obj;
+                lineID += 1;
+                output.write(String.valueOf(lineID));
+                output.write("\t");
                 output.write(String.valueOf(pageIndex));
+                output.write("\tIMAGE");
                 output.write("\t" + String.valueOf(image.x));
                 output.write("\t" + String.valueOf(image.y));
                 output.write("\t" + String.valueOf(image.w));
                 output.write("\t" + String.valueOf(image.h));
-                output.write("\n");
+                output.write("\n\n");
                 i++;
             }
             else i++;
