@@ -73,7 +73,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     static void processFile(Path path, Writer w) throws IOException {
         try (PDDocument doc = PDDocument.load(path.toFile())) {
             int lineID = 0;
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < doc.getNumberOfPages(); i++) {
                 PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, lineID);
                 ext.processPage(doc.getPage(i));
                 ext.write();
