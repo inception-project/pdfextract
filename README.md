@@ -1,6 +1,7 @@
 # pdfextract
 PDF extractor using PDFBox.  
 The jar file can be found at [releases](https://github.com/paperai/pdfextract/releases).
+* [PDFExtract.jl](https://github.com/hshindo/PDFExtract.jl): julia wrapper for pdfextract
 
 ## PDFExtractor
 Extract texts, draws and images from PDF.
