@@ -163,7 +163,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         TextOperator prev = textBuffer.get(0);
         for (TextOperator curr : textBuffer) {
             float expectedX = prev.bx + prev.bw + averageW * 0.3f;
-            if (curr.bx > expectedX) output.write("\n");
+            if (curr.bx > expectedX || prev.by != curr.by || prev.bh != curr.bh) output.write("\n");
             lineID += 1;
             output.write(String.valueOf(lineID));
             output.write("\t");
