@@ -24,6 +24,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
+
 public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     static boolean useText = false;
@@ -381,6 +383,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         float spaceWidthDisplay = spaceWidthText * textRenderingMatrix.getScalingFactorX();
         unicode = font.toUnicode(code, this.glyphList);
         if (unicode == null) unicode = "[NO_UNICODE]";
+        else if (StringUtils.isBlank(unicode)) return;
 
         Matrix translatedTextRenderingMatrix;
         if (this.translateMatrix == null) {
