@@ -3,22 +3,22 @@ import org.apache.pdfbox.pdmodel.font.PDFont;
 public class TextOperator {
     String unicode;
     PDFont font;
-    float bx;
-    float by;
-    float bw;
-    float bh;
+    float fx;
+    float fy;
+    float fw;
+    float fh;
     float gx;
     float gy;
     float gw;
     float gh;
 
-    public TextOperator(String unicode, PDFont font, float bx, float by, float bw, float bh, float gx, float gy, float gw, float gh) {
+    public TextOperator(String unicode, PDFont font, float fx, float fy, float fw, float fh, float gx, float gy, float gw, float gh) {
         this.unicode = unicode;
         this.font = font;
-        this.bx = bx;
-        this.by = by;
-        this.bw = bw;
-        this.bh = bh;
+        this.fx = fx;
+        this.fy = fy;
+        this.fw = fw;
+        this.fh = fh;
         this.gx = gx;
         this.gy = gy;
         this.gw = gw;

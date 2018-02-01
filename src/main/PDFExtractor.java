@@ -28,25 +28,8 @@ import org.apache.commons.lang3.StringUtils;
 
 public class PDFExtractor extends PDFGraphicsStreamEngine {
 
-    static boolean useText = false;
-    static boolean useDraw = false;
-    static boolean useImage = false;
-    static boolean useFontName = false;
-    static boolean useBounding = false;
-    static boolean useGlyph = false;
-
     public static void main(String[] args) throws IOException {
         Path path = Paths.get(args[0]);
-        for (String arg : args) {
-            if (arg.equals("-text")) useText = true;
-            else if (arg.equals("-draw")) useDraw = true;
-            else if (arg.equals("-image")) useImage = true;
-            else if (arg.equals("-fontName")) useFontName = true;
-            else if (arg.equals("-bounding")) useBounding = true;
-            else if (arg.equals("-glyph")) useGlyph = true;
-        }
-        if (!useText && !useDraw && !useImage) useText = useDraw = useImage = true;
-
         if (Files.isDirectory(path)) {
             FileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
                 @Override
@@ -154,37 +137,36 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     float getPageHeight() { return getPage().getCropBox().getHeight(); }
 
     void addDraw(String op, float... values) {
-        if (useDraw) buffer.add(new DrawOperator(op, values));
+        buffer.add(new DrawOperator(op, values));
     }
 
     void writeText(List<TextOperator> textBuffer) throws IOException {
         float averageW = 0;
-        for (TextOperator t : textBuffer) averageW += t.bw;
+        for (TextOperator t : textBuffer) averageW += t.fw;
         averageW /= textBuffer.size();
 
         TextOperator prev = textBuffer.get(0);
         for (TextOperator curr : textBuffer) {
-            float expectedX = prev.bx + prev.bw + averageW * 0.3f;
-            if (curr.bx > expectedX || prev.by != curr.by || prev.bh != curr.bh) output.write("\n");
+            float expectedX = prev.fx + prev.fw + averageW * 0.3f;
+            if (curr.fx > expectedX || prev.fy != curr.fy || prev.fh != curr.fh) output.write("\n");
             lineID += 1;
             output.write(String.valueOf(lineID));
             output.write("\t");
             output.write(String.valueOf(pageIndex));
             output.write("\tTEXT");
             output.write("\t" + curr.unicode);
-            if (useBounding) {
-                output.write("\t" + String.valueOf(curr.bx));
-                output.write("\t" + String.valueOf(curr.by));
-                output.write("\t" + String.valueOf(curr.bw));
-                output.write("\t" + String.valueOf(curr.bh));
-            }
-            if (useGlyph) {
-                output.write("\t" + String.valueOf(curr.gx));
-                output.write("\t" + String.valueOf(curr.gy));
-                output.write("\t" + String.valueOf(curr.gw));
-                output.write("\t" + String.valueOf(curr.gh));
-            }
-            if (useFontName) output.write("\t" + curr.font.getName());
+
+            output.write("\t" + String.valueOf(curr.fx));
+            output.write(" " + String.valueOf(curr.fy));
+            output.write(" " + String.valueOf(curr.fw));
+            output.write(" " + String.valueOf(curr.fh));
+
+            output.write("\t" + String.valueOf(curr.gx));
+            output.write(" " + String.valueOf(curr.gy));
+            output.write(" " + String.valueOf(curr.gw));
+            output.write(" " + String.valueOf(curr.gh));
+
+            output.write("\t" + curr.font.getName());
             output.write("\n");
 
             prev = curr;
@@ -217,7 +199,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                     obj = buffer.get(i);
                     if (obj instanceof TextOperator == false) break;
                     TextOperator t = (TextOperator)obj;
-                    if (t.by != t0.by || t.bh != t0.bh) break;
+                    if (t.fy != t0.fy || t.fh != t0.fh) break;
                     textBuffer.add(t);
                     i++;
                 }
@@ -245,9 +227,9 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 output.write(String.valueOf(pageIndex));
                 output.write("\tIMAGE");
                 output.write("\t" + String.valueOf(image.x));
-                output.write("\t" + String.valueOf(image.y));
-                output.write("\t" + String.valueOf(image.w));
-                output.write("\t" + String.valueOf(image.h));
+                output.write(" " + String.valueOf(image.y));
+                output.write(" " + String.valueOf(image.w));
+                output.write(" " + String.valueOf(image.h));
                 output.write("\n\n");
                 i++;
             }
@@ -257,7 +239,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     @Override
     public void drawImage(PDImage pdImage) throws IOException {
-        if (!useImage) return;
         ImageOperator i = imageBuffer.get(0);
         buffer.add(i);
         imageBuffer.remove(0);
@@ -312,7 +293,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     @Override
     public void showFontGlyph(Matrix textRenderingMatrix, PDFont font, int code, String unicode, Vector displacement) throws IOException {
-        if (!useText) return;
         // taken from LegacyPDFStreamEngine.showGlyph
         PDGraphicsState state = this.getGraphicsState();
         Matrix ctm = state.getCurrentTransformationMatrix();
@@ -398,17 +378,17 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 nextX, nextY, Math.abs(dyDisplay), dxDisplay, Math.abs(spaceWidthDisplay),
                 unicode, new int[]{code}, font, fontSize, (int)(fontSize * textMatrix.getScalingFactorX()));
 
-        Shape boundingShape = calculateBounds(text);
-        Rectangle2D.Double b = (Rectangle2D.Double)boundingShape.getBounds2D(); // bounding coordinates
+        Shape fontShape = calculateFontBounds(text);
+        Rectangle2D.Double f = (Rectangle2D.Double)fontShape.getBounds2D(); // font coordinates
         Shape glyphShape = calculateGlyphBounds(textRenderingMatrix, font, code);
         Rectangle2D.Double g = (Rectangle2D.Double)glyphShape.getBounds2D(); // glyph coordinates
-        TextOperator t = new TextOperator(unicode, font, (float)b.x, (float)b.y, (float)b.width, (float)b.height,
+        TextOperator t = new TextOperator(unicode, font, (float)f.x, (float)f.y, (float)f.width, (float)f.height,
                 (float)g.x, (float)g.y, (float)g.width, (float)g.height);
         buffer.add(t);
     }
 
     // taken from writeString in DrawPrintTextLocations
-    Shape calculateBounds(TextPosition text) throws IOException {
+    Shape calculateFontBounds(TextPosition text) throws IOException {
         // glyph space -> user space
         // note: text.getTextMatrix() is *not* the Text Matrix, it's the Text Rendering Matrix
         AffineTransform at = text.getTextMatrix().createAffineTransform();

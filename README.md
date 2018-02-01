@@ -6,26 +6,12 @@ The jar file can be found at [releases](https://github.com/paperai/pdfextract/re
 ## PDFExtractor
 Extract texts, draws and images from PDF.
 ```
-java -classpath pdfextract.jar PDFExtractor <file or directory> <options...>
+java -classpath pdfextract.jar PDFExtractor <file or directory>
 ```
-
-### Options
-* `-text`: extracts texts
-  * `-bounding`: extracts bounding coordinates
-  * `-glyph`: extracts glyph coordinates
-  * `-fontName`: extracts fontName
-* `-draw`: extracts draws
-* `-image`: extracts images
-
-For example,
-```
-java -classpath pdfextract.jar PDFExtractor xxx.pdf -text -bounding
-```
-extracts only texts with bounding coordinates from `xxx.pdf`.
 
 <p align="center"><img src="https://github.com/paperai/pdfextract/blob/master/PDFExtractor.png" width="1200"></p>
 
-In the figure, blue square indicates bounding coordinates, and red square indicates glyph coordinates.
+In the figure, blue square indicates font coordinates, and red square indicates glyph coordinates.
 
 ### Output Format
 Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
@@ -35,52 +21,43 @@ Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
 1. Page number
 1. "TEXT"
 1. Character
-1. [Optional] bounding x coordinate
-1. [Optional] bounding y coordinate
-1. [Optional] bounding width
-1. [Optional] bounding height
-1. [Optional] glyph x coordinate
-1. [Optional] glyph y coordinate
-1. [Optional] glyph width
-1. [Optional] glyph height
-1. [Optional] Font name
+1. Font coordinate (x, y, width, height)
+1. Glyph coordinate (x, y, width, height)
+1. Font name
 
 #### Draw
 1. ID
 1. Page number
 1. "DRAW"
 1. Operation ("LINE_TO", "CURVE_TO", etc.)
+1. Coordinate
 
 #### Image
 1. ID
 1. Page number
 1. "IMAGE"
-1. x coordinate
-1. y coordinate
-1. width
-1. height
+1. Coordinate (x, y, width, height)
 
 ### Output Example
 ```
-1   1	TEXT	P	106.4301	754.63226	5.478471	10.705882	106.4301	757.06213	5.424672	5.8550596	LMQTGC+NimbusRomNo9L-ReguItal
-2   1	TEXT	r	111.90857	754.63226	3.4879298	10.705882	112.31206	758.963	3.290669	3.9541826	LMQTGC+NimbusRomNo9L-ReguItal
-3   1	TEXT	o	114.99301	754.63226	4.4832	10.705882	115.23511	758.963	3.9541826	4.052813	LMQTGC+NimbusRomNo9L-ReguItal
-4   1	TEXT	c	119.47621	754.63226	3.981082	10.705882	119.7452	758.963	3.5417283	4.052813	LMQTGC+NimbusRomNo9L-ReguItal
-5   1	TEXT	e	123.45729	754.63226	3.981082	10.705882	123.73525	758.963	3.4161987	4.052813	LMQTGC+NimbusRomNo9L-ReguItal
-6   1	TEXT	e	127.43837	754.63226	3.981082	10.705882	127.71633	758.963	3.4161987	4.052813	LMQTGC+NimbusRomNo9L-ReguItal
-7   1	TEXT	d	131.41945	754.63226	4.4832	10.705882	131.55394	756.79315	4.590797	6.240615	LMQTGC+NimbusRomNo9L-ReguItal
-8   1	TEXT	i	135.90265	754.63226	2.4926593	10.705882	136.342	757.05316	1.9277761	5.9626565	LMQTGC+NimbusRomNo9L-ReguItal
-9   1	TEXT	n	138.39531	754.63226	4.4832	10.705882	138.52084	758.963	4.124544	4.03488	LMQTGC+NimbusRomNo9L-ReguItal
-10  1	TEXT	g	142.87851	754.63226	4.4832	10.705882	142.95024	758.963	4.16041	5.801261	LMQTGC+NimbusRomNo9L-ReguItal
-11  1	TEXT	s	147.36171	754.63226	3.4879298	10.705882	147.50517	758.95404	3.13824	4.0797124	LMQTGC+NimbusRomNo9L-ReguItal
+18914	7	TEXT	p	108.535255 489.41638 5.400005 13.014011	108.58926 494.42758 5.022004 7.3116064	JSOXBN+NimbusRomNo9L-Regu
+18915	7	TEXT	e	113.935265 489.41638 4.795204 13.014011	114.20526 494.42758 4.3092036 5.0760045	JSOXBN+NimbusRomNo9L-Regu
+18916	7	TEXT	r	118.73047 489.41638 3.5964031 13.014011	118.78447 494.42758 3.564003 4.968004	JSOXBN+NimbusRomNo9L-Regu
+18917	7	TEXT	f	122.326866 489.41638 3.5964031 13.014011	122.54287 492.0192 3.9204035 7.376406	JSOXBN+NimbusRomNo9L-Regu
+18918	7	TEXT	o	125.92327 489.41638 5.400005 13.014011	126.23647 494.42758 4.762804 5.0760045	JSOXBN+NimbusRomNo9L-Regu
+18919	7	TEXT	r	131.32327 489.41638 3.5964031 13.014011	131.37727 494.42758 3.564003 4.968004	JSOXBN+NimbusRomNo9L-Regu
+18920	7	TEXT	m	134.91968 489.41638 8.402408 13.014011	135.09248 494.42758 8.197207 4.968004	JSOXBN+NimbusRomNo9L-Regu
+18921	7	TEXT	a	143.32208 489.41638 4.795204 13.014011	143.72168 494.42758 4.374004 5.0760045	JSOXBN+NimbusRomNo9L-Regu
+18922	7	TEXT	n	148.1173 489.41638 5.400005 13.014011	148.2901 494.42758 5.065204 4.968004	JSOXBN+NimbusRomNo9L-Regu
+18923	7	TEXT	c	153.51729 489.41638 4.795204 13.014011	153.7873 494.42758 4.1796036 5.0760045	JSOXBN+NimbusRomNo9L-Regu
+18924	7	TEXT	e	158.31248 489.41638 4.795204 13.014011	158.58249 494.42758 4.3092036 5.0760045	JSOXBN+NimbusRomNo9L-Regu
 
-12  1	TEXT	o	153.09125	754.63226	4.4832	10.705882	153.33334	758.963	3.9541826	4.052813	LMQTGC+NimbusRomNo9L-ReguItal
-13  1	TEXT	f	157.57445	754.63226	2.4926593	10.705882	156.2564	756.83795	5.119815	7.9352646	LMQTGC+NimbusRomNo9L-ReguItal
+18925	7	TEXT	o	169.7605 489.41638 5.400005 13.014011	170.0737 494.42758 4.762804 5.0760045	JSOXBN+NimbusRomNo9L-Regu
+18926	7	TEXT	f	175.16049 489.41638 3.5964031 13.014011	175.3765 492.0192 3.9204035 7.376406	JSOXBN+NimbusRomNo9L-Regu
 
-14  1	TEXT	t	162.30872	754.63226	2.4926593	10.705882	162.64047	758.02155	2.3222978	4.994285	LMQTGC+NimbusRomNo9L-ReguItal
-15  1	TEXT	h	164.80138	754.63226	4.4832	10.705882	164.97174	756.79315	4.1155777	6.204749	LMQTGC+NimbusRomNo9L-ReguItal
-16  1	TEXT	e	169.28458	754.63226	3.981082	10.705882	169.56253	758.963	3.4161987	4.052813	LMQTGC+NimbusRomNo9L-ReguItal
-
+18927	7	TEXT	t	185.42052 489.41638 3.0024025 13.014011	185.56091 493.1424 2.8728025 6.3612056	JSOXBN+NimbusRomNo9L-Regu
+18928	7	TEXT	h	188.42291 489.41638 5.400005 13.014011	188.52011 492.0192 5.1624045 7.376406	JSOXBN+NimbusRomNo9L-Regu
+18929	7	TEXT	e	193.8229 489.41638 4.795204 13.014011	194.09291 494.42758 4.3092036 5.0760045	JSOXBN+NimbusRomNo9L-Regu
 ...
 
 9409	4	DRAW	MOVE_TO	129.75435	61.265076
@@ -89,11 +66,11 @@ Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
 
 ...
 
-9433	4	IMAGE	147.50803	92.62935	93.875755	85.535995
+9433	4	IMAGE	147.50803 92.62935 93.875755 85.535995
 
-9434	4	IMAGE	253.21825	93.69855	105.636955	84.4668
+9434	4	IMAGE	253.21825 93.69855 105.636955 84.4668
 
-9435	4	IMAGE	370.68967	93.69855	105.636955	84.4668
+9435	4	IMAGE	370.68967 93.69855 105.636955 84.4668
 ```
 
 ## ImageExtractor
