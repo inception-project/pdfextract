@@ -35,7 +35,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     if (file.toString().endsWith(".pdf")) {
-                        String outPath = file.toString() + "txt";
+                        String outPath = file.toString() + ".txt";
                         System.out.println(file.toFile());
                         try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
                             processFile(file, w);
