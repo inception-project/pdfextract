@@ -104,7 +104,7 @@ public class ImageExtractor extends PDFStreamEngine {
                 float y = pageRect.getHeight() - ctmNew.getTranslateY() - h;
                 buffer.add(new ImageOperator(x, y, w, h));
             }
-            else if(xobject instanceof PDFormXObject) {
+            else if (xobject instanceof PDFormXObject) {
                 PDFormXObject form = (PDFormXObject)xobject;
                 showForm(form);
             }

@@ -51,19 +51,20 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
                 processFile(path, w);
             }
-            catch (Exception e) { }
+            catch (Exception e) {
+                // System.out.println(e.toString());
+            }
         }
     }
 
     static void processFile(Path path, Writer w) throws IOException {
-        try (PDDocument doc = PDDocument.load(path.toFile())) {
-            int lineID = 0;
-            for (int i = 0; i < doc.getNumberOfPages(); i++) {
-                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, lineID);
-                ext.processPage(doc.getPage(i));
-                ext.write();
-                lineID = ext.lineID;
-            }
+        PDDocument doc = PDDocument.load(path.toFile());
+        int lineID = 0;
+        for (int i = 0; i < doc.getNumberOfPages(); i++) {
+            PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, lineID);
+            ext.processPage(doc.getPage(i));
+            ext.write();
+            lineID = ext.lineID;
         }
     }
 
@@ -239,6 +240,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     @Override
     public void drawImage(PDImage pdImage) throws IOException {
+        if (imageBuffer.isEmpty()) return; // Inconsistency occurs at P17-1011.pdf (Discourse Mode Identification in Essays)
         ImageOperator i = imageBuffer.get(0);
         buffer.add(i);
         imageBuffer.remove(0);
