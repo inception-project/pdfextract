@@ -59,34 +59,33 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     static void processFile(Path path, Writer w) throws IOException {
         PDDocument doc = PDDocument.load(path.toFile());
-        int lineID = 0;
+        int tokenId = 0;
         for (int i = 0; i < doc.getNumberOfPages(); i++) {
-            PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, lineID);
+            PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, tokenId);
             ext.processPage(doc.getPage(i));
             ext.write();
-            lineID = ext.lineID;
+            tokenId = ext.tokenId;
         }
     }
 
     Writer output;
     int pageIndex;
-    int lineID;
+    int tokenId;
     int pageRotation;
     PDRectangle pageSize;
     Matrix translateMatrix;
     final GlyphList glyphList;
-    List<ImageOperator> imageBuffer;
     List<Object> buffer = new ArrayList<>();
 
     AffineTransform flipAT;
     AffineTransform rotateAT;
     AffineTransform transAT;
 
-    public PDFExtractor(PDPage page, int pageIndex, Writer output, int lineID) throws IOException {
+    public PDFExtractor(PDPage page, int pageIndex, Writer output, int tokenId) throws IOException {
         super(page);
         this.pageIndex = pageIndex;
         this.output = output;
-        this.lineID = lineID;
+        this.tokenId = tokenId;
 
         String path = "org/apache/pdfbox/resources/glyphlist/additional.txt";
         InputStream input = GlyphList.class.getClassLoader().getResourceAsStream(path);
@@ -129,10 +128,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         }
         // cropbox
         transAT = AffineTransform.getTranslateInstance(-cropBox.getLowerLeftX(), cropBox.getLowerLeftY());
-
-        ImageExtractor ext = new ImageExtractor();
-        ext.processPage(page);
-        imageBuffer = ext.buffer;
     }
 
     float getPageHeight() { return getPage().getCropBox().getHeight(); }
@@ -150,8 +145,8 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         for (TextOperator curr : textBuffer) {
             float expectedX = prev.fx + prev.fw + averageW * 0.3f;
             if (curr.fx > expectedX || prev.fy != curr.fy || prev.fh != curr.fh) output.write("\n");
-            lineID += 1;
-            output.write(String.valueOf(lineID));
+            tokenId += 1;
+            output.write(String.valueOf(tokenId));
             output.write("\t");
             output.write(String.valueOf(pageIndex));
             output.write("\tTEXT");
@@ -166,8 +161,6 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             output.write(" " + String.valueOf(curr.gy));
             output.write(" " + String.valueOf(curr.gw));
             output.write(" " + String.valueOf(curr.gh));
-
-            output.write("\t" + curr.font.getName());
             output.write("\n");
 
             prev = curr;
@@ -177,8 +170,8 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     void writeDraw(List<DrawOperator> drawBuffer) throws IOException {
         for (DrawOperator d : drawBuffer) {
-            lineID += 1;
-            output.write(String.valueOf(lineID));
+            tokenId += 1;
+            output.write(String.valueOf(tokenId));
             output.write("\t");
             output.write(String.valueOf(pageIndex));
             output.write("\tDRAW");
@@ -220,31 +213,12 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                     }
                 }
             }
-            else if (obj instanceof ImageOperator) {
-                ImageOperator image = (ImageOperator)obj;
-                lineID += 1;
-                output.write(String.valueOf(lineID));
-                output.write("\t");
-                output.write(String.valueOf(pageIndex));
-                output.write("\tIMAGE");
-                output.write("\t" + String.valueOf(image.x));
-                output.write(" " + String.valueOf(image.y));
-                output.write(" " + String.valueOf(image.w));
-                output.write(" " + String.valueOf(image.h));
-                output.write("\n\n");
-                i++;
-            }
             else i++;
         }
     }
 
     @Override
-    public void drawImage(PDImage pdImage) throws IOException {
-        if (imageBuffer.isEmpty()) return; // Inconsistency occurs at P17-1011.pdf (Discourse Mode Identification in Essays)
-        ImageOperator i = imageBuffer.get(0);
-        buffer.add(i);
-        imageBuffer.remove(0);
-    }
+    public void drawImage(PDImage pdImage) throws IOException { }
 
     @Override
     public void appendRectangle(Point2D p0, Point2D p1, Point2D p2, Point2D p3) throws IOException {
@@ -384,7 +358,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         Rectangle2D.Double f = (Rectangle2D.Double)fontShape.getBounds2D(); // font coordinates
         Shape glyphShape = calculateGlyphBounds(textRenderingMatrix, font, code);
         Rectangle2D.Double g = (Rectangle2D.Double)glyphShape.getBounds2D(); // glyph coordinates
-        TextOperator t = new TextOperator(unicode, font, (float)f.x, (float)f.y, (float)f.width, (float)f.height,
+        TextOperator t = new TextOperator(unicode, (float)f.x, (float)f.y, (float)f.width, (float)f.height,
                 (float)g.x, (float)g.y, (float)g.width, (float)g.height);
         buffer.add(t);
     }

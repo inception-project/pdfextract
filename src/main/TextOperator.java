@@ -1,8 +1,5 @@
-import org.apache.pdfbox.pdmodel.font.PDFont;
-
 public class TextOperator {
     String unicode;
-    PDFont font;
     float fx;
     float fy;
     float fw;
@@ -12,9 +9,8 @@ public class TextOperator {
     float gw;
     float gh;
 
-    public TextOperator(String unicode, PDFont font, float fx, float fy, float fw, float fh, float gx, float gy, float gw, float gh) {
+    public TextOperator(String unicode, float fx, float fy, float fw, float fh, float gx, float gy, float gw, float gh) {
         this.unicode = unicode;
-        this.font = font;
         this.fx = fx;
         this.fy = fy;
         this.fw = fw;
