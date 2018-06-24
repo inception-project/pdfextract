@@ -136,6 +136,14 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         buffer.add(new DrawOperator(op, values));
     }
 
+    void writeLine(Object... values) throws IOException {
+        output.write(String.valueOf(values[0]));
+        for (int i = 1; i < values.length; i++) {
+            output.write("\t");
+            output.write(String.valueOf(values[i]));
+        }
+    }
+
     void writeText(List<TextOperator> textBuffer) throws IOException {
         float averageW = 0;
         for (TextOperator t : textBuffer) averageW += t.fw;
@@ -144,25 +152,12 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         TextOperator prev = textBuffer.get(0);
         for (TextOperator curr : textBuffer) {
             float expectedX = prev.fx + prev.fw + averageW * 0.3f;
-            if (curr.fx > expectedX || prev.fy != curr.fy || prev.fh != curr.fh) output.write("\n");
+            //if (curr.fx > expectedX || prev.fy != curr.fy || prev.fh != curr.fh) output.write("\n");
+            if (curr.fx > expectedX) output.write("\n");
             tokenId += 1;
-            output.write(String.valueOf(tokenId));
-            output.write("\t");
-            output.write(String.valueOf(pageIndex));
-            output.write("\tTEXT");
-            output.write("\t" + curr.unicode);
-
-            output.write("\t" + String.valueOf(curr.fx));
-            output.write(" " + String.valueOf(curr.fy));
-            output.write(" " + String.valueOf(curr.fw));
-            output.write(" " + String.valueOf(curr.fh));
-
-            output.write("\t" + String.valueOf(curr.gx));
-            output.write(" " + String.valueOf(curr.gy));
-            output.write(" " + String.valueOf(curr.gw));
-            output.write(" " + String.valueOf(curr.gh));
+            writeLine(tokenId, pageIndex, "TEXT", curr.unicode,
+                    curr.fx, curr.fy, curr.fw, curr.fh, curr.gx, curr.gy, curr.gw, curr.gh);
             output.write("\n");
-
             prev = curr;
         }
         output.write("\n");
@@ -171,11 +166,8 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     void writeDraw(List<DrawOperator> drawBuffer) throws IOException {
         for (DrawOperator d : drawBuffer) {
             tokenId += 1;
-            output.write(String.valueOf(tokenId));
-            output.write("\t");
-            output.write(String.valueOf(pageIndex));
-            output.write("\tDRAW");
-            output.write("\t" + String.valueOf(d.type));
+
+            writeLine(tokenId, pageIndex, "DRAW", d.type);
             for (Float f : d.values)  output.write("\t" + String.valueOf(f));
             output.write("\n");
         }
