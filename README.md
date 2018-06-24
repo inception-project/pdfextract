@@ -14,7 +14,7 @@ java -classpath pdfextract.jar PDFExtractor <file or directory>
 In the figure, blue square indicates font coordinates, and red square indicates glyph coordinates.
 
 ### Output Format
-Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
+Each line is `Text` or `Draw`.
 
 #### Text
 1. ID
@@ -23,7 +23,6 @@ Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
 1. Character
 1. Font coordinate (x, y, width, height)
 1. Glyph coordinate (x, y, width, height)
-1. Font name
 
 #### Draw
 1. ID
@@ -31,12 +30,6 @@ Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
 1. "DRAW"
 1. Operation ("LINE_TO", "CURVE_TO", etc.)
 1. Coordinate
-
-#### Image
-1. ID
-1. Page number
-1. "IMAGE"
-1. Coordinate (x, y, width, height)
 
 ### Output Example
 ```
@@ -63,14 +56,6 @@ Each line is either one of "TEXT", "DRAW", "IMAGE", or empty.
 9409	4	DRAW	MOVE_TO	129.75435	61.265076
 9410	4	DRAW	LINE_TO	482.24384	61.265076
 9411	4	DRAW	STROKE_PATH
-
-...
-
-9433	4	IMAGE	147.50803 92.62935 93.875755 85.535995
-
-9434	4	IMAGE	253.21825 93.69855 105.636955 84.4668
-
-9435	4	IMAGE	370.68967 93.69855 105.636955 84.4668
 ```
 
 ## ImageExtractor
