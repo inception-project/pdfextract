@@ -1,3 +1,5 @@
+package paperai.pdfextract;
+
 public class DrawOperator {
     String type;
     float[] values;

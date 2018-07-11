@@ -1,3 +1,5 @@
+package paperai.pdfextract;
+
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 

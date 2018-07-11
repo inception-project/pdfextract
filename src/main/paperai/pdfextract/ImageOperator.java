@@ -1,3 +1,5 @@
+package paperai.pdfextract;
+
 public class ImageOperator {
     float x;
     float y;

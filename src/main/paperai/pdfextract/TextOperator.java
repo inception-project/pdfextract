@@ -1,3 +1,5 @@
+package paperai.pdfextract;
+
 public class TextOperator {
     String unicode;
     float fx;

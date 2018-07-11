@@ -1,3 +1,5 @@
+package paperai.pdfextract;
+
 import org.apache.fontbox.ttf.TrueTypeFont;
 import org.apache.fontbox.util.BoundingBox;
 import org.apache.pdfbox.contentstream.PDFGraphicsStreamEngine;
@@ -12,6 +14,7 @@ import org.apache.pdfbox.pdmodel.graphics.state.PDGraphicsState;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 import org.apache.pdfbox.util.Vector;
+import org.apache.commons.io.FileUtils;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
@@ -23,6 +26,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
+import java.net.URL;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -55,6 +59,36 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 // System.out.println(e.toString());
             }
         }
+    }
+
+    public static String load(String path) {
+        String result = "";
+        try {
+            File file;
+            if (path.startsWith("http")) {
+                URL url = new URL(path);
+                file = Files.createTempFile(Paths.get("/tmp"), "", ".pdf").toFile();
+                FileUtils.copyURLToFile(url, file);
+            } else {
+                file = Paths.get(path).toFile();
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            Writer w = new OutputStreamWriter(out, "UTF-8");
+            PDDocument doc = PDDocument.load(file);
+            int tokenId = 0;
+            for (int i = 0; i < doc.getNumberOfPages(); i++) {
+                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, tokenId);
+                ext.processPage(doc.getPage(i));
+                ext.write();
+                tokenId = ext.tokenId;
+            }
+            w.flush();
+            w.close();
+            result = out.toString();
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        return result;
     }
 
     static void processFile(Path path, Writer w) throws IOException {
