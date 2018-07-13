@@ -37,7 +37,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         if (path.isDirectory()) {
             for (File file : path.listFiles()) {
                 if (file.isFile() && file.getName().endsWith(".pdf")) {
-                    String outPath = String.format("%s.03.txt.gz", file);
+                    String outPath = String.format("%s.0-3-0.txt.gz", file);
                     try {
                         GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(outPath));
                         Writer w = new BufferedWriter(new OutputStreamWriter(gzip, "UTF-8"));
