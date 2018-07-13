@@ -14,7 +14,6 @@ import org.apache.pdfbox.pdmodel.graphics.state.PDGraphicsState;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 import org.apache.pdfbox.util.Vector;
-import org.apache.commons.io.FileUtils;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
@@ -22,89 +21,54 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.*;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
-import java.net.URL;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.lang3.StringUtils;
 
 public class PDFExtractor extends PDFGraphicsStreamEngine {
 
+    static boolean showGlyphCoord = false;
+
     public static void main(String[] args) throws IOException {
-        Path path = Paths.get(args[0]);
-        if (Files.isDirectory(path)) {
-            FileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    if (file.toString().endsWith(".pdf")) {
-                        String outPath = file.toString() + ".txt";
-                        System.out.println(file.toFile());
-                        try (Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"))) {
-                            processFile(file, w);
-                        }
-                        catch (Exception e) { }
+        File path = args.length == 0 ? new File(".") : new File(args[0]);
+        if (args.length > 1 && args[1].equals("-glyph")) showGlyphCoord = true;
+        if (path.isDirectory()) {
+            for (File file : path.listFiles()) {
+                if (file.isFile() && file.getName().endsWith(".pdf")) {
+                    String outPath = String.format("%s.03.txt.gz", file);
+                    try {
+                        GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(outPath));
+                        Writer w = new BufferedWriter(new OutputStreamWriter(gzip, "UTF-8"));
+                        // Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"));
+                        processFile(file, w);
+                        w.close();
                     }
-                    return FileVisitResult.CONTINUE;
+                    catch (Exception e) {
+                        System.out.println(e.getMessage());
+                    }
                 }
-            };
-            Files.walkFileTree(path, visitor);
+            }
         }
         else {
-            try (Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"))) {
-                processFile(path, w);
-            }
-            catch (Exception e) {
-                // System.out.println(e.toString());
-            }
-        }
-    }
-
-    public static String load(String path) {
-        String result = "";
-        try {
-            File file;
-            if (path.startsWith("http")) {
-                URL url = new URL(path);
-                file = Files.createTempFile(Paths.get("/tmp"), "", ".pdf").toFile();
-                FileUtils.copyURLToFile(url, file);
-            } else {
-                file = Paths.get(path).toFile();
-            }
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            Writer w = new OutputStreamWriter(out, "UTF-8");
-            PDDocument doc = PDDocument.load(file);
-            int tokenId = 0;
-            for (int i = 0; i < doc.getNumberOfPages(); i++) {
-                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, tokenId);
-                ext.processPage(doc.getPage(i));
-                ext.write();
-                tokenId = ext.tokenId;
-            }
-            w.flush();
+            Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"));
+            processFile(path, w);
             w.close();
-            result = out.toString();
-        } catch (Exception e) {
-            System.out.println(e);
         }
-        return result;
     }
 
-    static void processFile(Path path, Writer w) throws IOException {
-        PDDocument doc = PDDocument.load(path.toFile());
-        int tokenId = 0;
+    public static void processFile(File file, Writer w) throws IOException {
+        PDDocument doc = PDDocument.load(file);
         for (int i = 0; i < doc.getNumberOfPages(); i++) {
-            PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w, tokenId);
+            PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
             ext.processPage(doc.getPage(i));
             ext.write();
-            tokenId = ext.tokenId;
         }
     }
 
     Writer output;
     int pageIndex;
-    int tokenId;
     int pageRotation;
     PDRectangle pageSize;
     Matrix translateMatrix;
@@ -115,11 +79,10 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     AffineTransform rotateAT;
     AffineTransform transAT;
 
-    public PDFExtractor(PDPage page, int pageIndex, Writer output, int tokenId) throws IOException {
+    public PDFExtractor(PDPage page, int pageIndex, Writer output) throws IOException {
         super(page);
         this.pageIndex = pageIndex;
         this.output = output;
-        this.tokenId = tokenId;
 
         String path = "org/apache/pdfbox/resources/glyphlist/additional.txt";
         InputStream input = GlyphList.class.getClassLoader().getResourceAsStream(path);
@@ -170,76 +133,32 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         buffer.add(new DrawOperator(op, values));
     }
 
-    void writeLine(Object... values) throws IOException {
-        output.write(String.valueOf(values[0]));
-        for (int i = 1; i < values.length; i++) {
-            output.write("\t");
-            output.write(String.valueOf(values[i]));
-        }
-    }
-
-    void writeText(List<TextOperator> textBuffer) throws IOException {
-        float averageW = 0;
-        for (TextOperator t : textBuffer) averageW += t.fw;
-        averageW /= textBuffer.size();
-
-        TextOperator prev = textBuffer.get(0);
-        for (TextOperator curr : textBuffer) {
-            float expectedX = prev.fx + prev.fw + averageW * 0.3f;
-            //if (curr.fx > expectedX || prev.fy != curr.fy || prev.fh != curr.fh) output.write("\n");
-            if (curr.fx > expectedX) output.write("\n");
-            tokenId += 1;
-            writeLine(tokenId, pageIndex, "TEXT", curr.unicode,
-                    curr.fx, curr.fy, curr.fw, curr.fh, curr.gx, curr.gy, curr.gw, curr.gh);
-            output.write("\n");
-            prev = curr;
-        }
-        output.write("\n");
-    }
-
-    void writeDraw(List<DrawOperator> drawBuffer) throws IOException {
-        for (DrawOperator d : drawBuffer) {
-            tokenId += 1;
-
-            writeLine(tokenId, pageIndex, "DRAW", d.type);
-            for (Float f : d.values)  output.write("\t" + String.valueOf(f));
-            output.write("\n");
-        }
-        output.write("\n");
-    }
-
     void write() throws IOException {
-        int i = 0;
-        while (i < buffer.size()) {
-            Object obj = buffer.get(i);
+        TextOperator t0 = null;
+        for (Object obj : buffer) {
             if (obj instanceof TextOperator) {
-                TextOperator t0 = (TextOperator)obj;
-                List<TextOperator> textBuffer = new ArrayList<>();
-                while (i < buffer.size()) {
-                    obj = buffer.get(i);
-                    if (obj instanceof TextOperator == false) break;
-                    TextOperator t = (TextOperator)obj;
-                    if (t.fy != t0.fy || t.fh != t0.fh) break;
-                    textBuffer.add(t);
-                    i++;
+                TextOperator t = (TextOperator)obj;
+                String fx = (t0 != null && t.fx == t0.fx) ? "_" : String.valueOf(t.fx);
+                String fy = (t0 != null && t.fy == t0.fy) ? "_" : String.valueOf(t.fy);
+                String fw = (t0 != null && t.fw == t0.fw) ? "_" : String.valueOf(t.fw);
+                String fh = (t0 != null && t.fh == t0.fh) ? "_" : String.valueOf(t.fh);
+                output.write(String.format("%s\t%s\t%s\t%s\t%s\t%s", pageIndex, t.unicode, t.fx, t.fy, t.fw, t.fh));
+
+                if (showGlyphCoord) {
+                    String gx = (t0 != null && t.gx == t0.gx) ? "_" : String.valueOf(t.gx);
+                    String gy = (t0 != null && t.gy == t0.gy) ? "_" : String.valueOf(t.gy);
+                    String gw = (t0 != null && t.gw == t0.gw) ? "_" : String.valueOf(t.gw);
+                    String gh = (t0 != null && t.gh == t0.gh) ? "_" : String.valueOf(t.gh);
+                    output.write(String.format("\t%s\t%s\t%s\t%s", gx, gy, gw, gh));
                 }
-                writeText(textBuffer);
+                t0 = t;
+            } else if (obj instanceof DrawOperator) {
+                t0 = null;
+                DrawOperator d = (DrawOperator)obj;
+                output.write(String.format("%s\t[%s]", pageIndex, d.type));
+                for (Float f : d.values) output.write(String.format("\t%s", f));
             }
-            else if (obj instanceof DrawOperator) {
-                List<DrawOperator> drawBuffer = new ArrayList<>();
-                while (i < buffer.size()) {
-                    obj = buffer.get(i);
-                    if (obj instanceof DrawOperator == false) break;
-                    DrawOperator d = (DrawOperator)obj;
-                    drawBuffer.add(d);
-                    i++;
-                    if (d.type.endsWith("_PATH")) {
-                        writeDraw(drawBuffer);
-                        break;
-                    }
-                }
-            }
-            else i++;
+            output.write("\n");
         }
     }
 
@@ -364,7 +283,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
         float spaceWidthDisplay = spaceWidthText * textRenderingMatrix.getScalingFactorX();
         unicode = font.toUnicode(code, this.glyphList);
-        if (unicode == null) unicode = "[NO_UNICODE]";
+        if (unicode == null) unicode = "NO_UNICODE";
         else if (StringUtils.isBlank(unicode)) return;
 
         Matrix translatedTextRenderingMatrix;
