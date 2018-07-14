@@ -134,29 +134,19 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     }
 
     void write() throws IOException {
-        TextOperator t0 = null;
         for (Object obj : buffer) {
             if (obj instanceof TextOperator) {
                 TextOperator t = (TextOperator)obj;
-                String fx = (t0 != null && t.fx == t0.fx) ? "_" : String.valueOf(t.fx);
-                String fy = (t0 != null && t.fy == t0.fy) ? "_" : String.valueOf(t.fy);
-                String fw = (t0 != null && t.fw == t0.fw) ? "_" : String.valueOf(t.fw);
-                String fh = (t0 != null && t.fh == t0.fh) ? "_" : String.valueOf(t.fh);
-                output.write(String.format("%s\t%s\t%s\t%s\t%s\t%s", pageIndex, t.unicode, t.fx, t.fy, t.fw, t.fh));
+                output.write(String.format("%s\t%s\t%s %s %s %s", pageIndex, t.unicode, t.fx, t.fy, t.fw, t.fh));
 
                 if (showGlyphCoord) {
-                    String gx = (t0 != null && t.gx == t0.gx) ? "_" : String.valueOf(t.gx);
-                    String gy = (t0 != null && t.gy == t0.gy) ? "_" : String.valueOf(t.gy);
-                    String gw = (t0 != null && t.gw == t0.gw) ? "_" : String.valueOf(t.gw);
-                    String gh = (t0 != null && t.gh == t0.gh) ? "_" : String.valueOf(t.gh);
-                    output.write(String.format("\t%s\t%s\t%s\t%s", gx, gy, gw, gh));
+                    output.write(String.format("\t%s %s %s %s", t.gx, t.gy, t.gw, t.gh));
                 }
-                t0 = t;
             } else if (obj instanceof DrawOperator) {
-                t0 = null;
                 DrawOperator d = (DrawOperator)obj;
                 output.write(String.format("%s\t[%s]", pageIndex, d.type));
-                for (Float f : d.values) output.write(String.format("\t%s", f));
+                if (d.values.length > 0) output.write(String.format("\t%s", d.values[0]));
+                for (int k = 1; k < d.values.length; k++) output.write(String.format(" %s", d.values[k]));
             }
             output.write("\n");
         }
