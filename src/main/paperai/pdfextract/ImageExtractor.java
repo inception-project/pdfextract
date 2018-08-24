@@ -34,22 +34,16 @@ public class ImageExtractor extends PDFStreamEngine {
         int dpi = map.containsKey("-dpi") ? Integer.parseInt(map.get("-dpi")) : 300;
 
         if (inFile.isDirectory()) {
-            FileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    if (file.toString().endsWith(".pdf")) {
-                        try {
-                            processFile(file.toFile(), dpi, outDir);
-                        }
-                        catch (Exception e) { }
+            for (File file : inFile.listFiles()) {
+                if (file.isFile() && file.getName().endsWith(".pdf")) {
+                    try {
+                        processFile(file, dpi, outDir);
                     }
-                    return FileVisitResult.CONTINUE;
+                    catch (Exception e) { }
                 }
-            };
-            Files.walkFileTree(inFile.toPath(), visitor);
-        } else {
-            processFile(inFile, dpi, outDir);
+            }
         }
+        else processFile(inFile, dpi, outDir);
     }
 
     static void processFile(File inFile, int dpi, String outDir) throws IOException {
@@ -80,7 +74,7 @@ public class ImageExtractor extends PDFStreamEngine {
 
     List<ImageOperator> buffer = new ArrayList<>();
 
-    public ImageExtractor() throws IOException {
+    public ImageExtractor() {
         addOperator(new Concatenate());
         addOperator(new DrawObject());
         addOperator(new SetGraphicsStateParameters());

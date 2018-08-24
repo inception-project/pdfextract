@@ -29,41 +29,39 @@ import org.apache.commons.lang3.StringUtils;
 
 public class PDFExtractor extends PDFGraphicsStreamEngine {
 
-    static boolean showGlyphCoord = false;
-
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         File path = args.length == 0 ? new File(".") : new File(args[0]);
-        if (args.length > 1 && args[1].equals("-glyph")) showGlyphCoord = true;
         if (path.isDirectory()) {
             for (File file : path.listFiles()) {
-                if (file.isFile() && file.getName().endsWith(".pdf")) {
-                    String outPath = String.format("%s.0-3-0.txt.gz", file);
-                    try {
-                        GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(outPath));
-                        Writer w = new BufferedWriter(new OutputStreamWriter(gzip, "UTF-8"));
-                        // Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"));
-                        processFile(file, w);
-                        w.close();
-                    }
-                    catch (Exception e) {
-                        System.out.println(e.getMessage());
-                    }
-                }
+                if (file.isFile() && file.getName().endsWith(".pdf")) processFile(file);
             }
         }
         else {
-            Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"));
-            processFile(path, w);
-            w.close();
+            // Writer w = new BufferedWriter(new OutputStreamWriter(System.out, "UTF-8"));
+            // processFile(path, w);
+            // w.close();
+            if (path.isFile()) processFile(path);
         }
     }
 
-    public static void processFile(File file, Writer w) throws IOException {
-        PDDocument doc = PDDocument.load(file);
-        for (int i = 0; i < doc.getNumberOfPages(); i++) {
-            PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
-            ext.processPage(doc.getPage(i));
-            ext.write();
+    static void processFile(File file) {
+        String outPath = String.format("%s.0-3-1.txt.gz", file);
+        try {
+            PDDocument doc = PDDocument.load(file);
+
+            GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(outPath));
+            Writer w = new BufferedWriter(new OutputStreamWriter(gzip, "UTF-8"));
+            // Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"));
+
+            for (int i = 0; i < doc.getNumberOfPages(); i++) {
+                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
+                ext.processPage(doc.getPage(i));
+                ext.write();
+            }
+            w.close();
+        }
+        catch (Exception e) {
+            System.out.println(e.getMessage());
         }
     }
 
@@ -138,10 +136,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             if (obj instanceof TextOperator) {
                 TextOperator t = (TextOperator)obj;
                 output.write(String.format("%s\t%s\t%s %s %s %s", pageIndex, t.unicode, t.fx, t.fy, t.fw, t.fh));
-
-                if (showGlyphCoord) {
-                    output.write(String.format("\t%s %s %s %s", t.gx, t.gy, t.gw, t.gh));
-                }
+                output.write(String.format("\t%s %s %s %s", t.gx, t.gy, t.gw, t.gh));
             } else if (obj instanceof DrawOperator) {
                 DrawOperator d = (DrawOperator)obj;
                 output.write(String.format("%s\t[%s]", pageIndex, d.type));
