@@ -21,6 +21,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
@@ -48,15 +49,14 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         PDDocument doc = PDDocument.load(file);
 
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        BufferedOutputStream buf = new BufferedOutputStream(bos);
-        Writer w = new BufferedWriter(new OutputStreamWriter(bos, "UTF-8"));
+        try (Writer w = new OutputStreamWriter(bos, StandardCharsets.UTF_8)) {
 
-        for (int i = 0; i < doc.getNumberOfPages(); i++) {
-            PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
-            ext.processPage(doc.getPage(i));
-            ext.write();
+            for (int i = 0; i < doc.getNumberOfPages(); i++) {
+                PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
+                ext.processPage(doc.getPage(i));
+                ext.write();
+            }
         }
-        w.close();
         return bos.toString();
     }
 
