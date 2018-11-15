@@ -21,7 +21,6 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
@@ -45,13 +44,14 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         }
     }
 
-    public static String processFileToString(File file) throws IOException {
+    public static String processFileToString(File file, boolean writeGlyphCoords) throws IOException {
         PDDocument doc = PDDocument.load(file);
 
         try (StringWriter w = new StringWriter()) {
 
             for (int i = 0; i < doc.getNumberOfPages(); i++) {
                 PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
+                ext.setWriteGlyphCoords(writeGlyphCoords);
                 ext.processPage(doc.getPage(i));
                 ext.write();
             }
@@ -80,6 +80,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         }
     }
 
+    private boolean writeGlyphCoords;
     Writer output;
     int pageIndex;
     int pageRotation;
@@ -96,6 +97,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         super(page);
         this.pageIndex = pageIndex;
         this.output = output;
+        this.writeGlyphCoords = true;
 
         String path = "org/apache/pdfbox/resources/glyphlist/additional.txt";
         InputStream input = GlyphList.class.getClassLoader().getResourceAsStream(path);
@@ -151,7 +153,9 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
             if (obj instanceof TextOperator) {
                 TextOperator t = (TextOperator)obj;
                 output.write(String.format("%s\t%s\t%s %s %s %s", pageIndex, t.unicode, t.fx, t.fy, t.fw, t.fh));
-                output.write(String.format("\t%s %s %s %s", t.gx, t.gy, t.gw, t.gh));
+                if (isWriteGlyphCoords()) {
+                    output.write(String.format("\t%s %s %s %s", t.gx, t.gy, t.gw, t.gh));
+                }
             } else if (obj instanceof DrawOperator) {
                 DrawOperator d = (DrawOperator)obj;
                 output.write(String.format("%s\t[%s]", pageIndex, d.type));
@@ -397,5 +401,13 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         s = rotateAT.createTransformedShape(s);
         s = transAT.createTransformedShape(s);
         return s;
+    }
+
+    public boolean isWriteGlyphCoords() {
+        return writeGlyphCoords;
+    }
+
+    public void setWriteGlyphCoords(boolean writeGlyphCoords) {
+        this.writeGlyphCoords = writeGlyphCoords;
     }
 }
