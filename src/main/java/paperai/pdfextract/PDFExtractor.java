@@ -44,6 +44,22 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
         }
     }
 
+    public static String processFileToString(File file) throws IOException {
+        PDDocument doc = PDDocument.load(file);
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        BufferedOutputStream buf = new BufferedOutputStream(bos);
+        Writer w = new BufferedWriter(new OutputStreamWriter(bos, "UTF-8"));
+
+        for (int i = 0; i < doc.getNumberOfPages(); i++) {
+            PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
+            ext.processPage(doc.getPage(i));
+            ext.write();
+        }
+        w.close();
+        return bos.toString();
+    }
+
     static void processFile(File file) {
         String outPath = String.format("%s.0-3-1.txt.gz", file);
         try {
