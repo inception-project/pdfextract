@@ -48,16 +48,15 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     public static String processFileToString(File file) throws IOException {
         PDDocument doc = PDDocument.load(file);
 
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        try (Writer w = new OutputStreamWriter(bos, StandardCharsets.UTF_8)) {
+        try (StringWriter w = new StringWriter()) {
 
             for (int i = 0; i < doc.getNumberOfPages(); i++) {
                 PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
                 ext.processPage(doc.getPage(i));
                 ext.write();
             }
+            return w.toString();
         }
-        return bos.toString();
     }
 
     static void processFile(File file) {
