@@ -3,3 +3,6 @@ data/
 out/
 *.iml
 target/
+.project
+.settings
+.classpath
