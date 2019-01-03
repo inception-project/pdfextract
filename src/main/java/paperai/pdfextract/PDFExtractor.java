@@ -56,6 +56,8 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 ext.write();
             }
             return w.toString();
+        } finally {
+            doc.close();
         }
     }
 
@@ -74,6 +76,7 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
                 ext.write();
             }
             w.close();
+            doc.close();
         }
         catch (Exception e) {
             System.out.println(e.getMessage());
