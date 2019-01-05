@@ -45,9 +45,9 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
     }
 
     public static String processFileToString(File file, boolean writeGlyphCoords) throws IOException {
-        PDDocument doc = PDDocument.load(file);
-
-        try (StringWriter w = new StringWriter()) {
+        try (StringWriter w = new StringWriter();
+             PDDocument doc = PDDocument.load(file)
+        ) {
 
             for (int i = 0; i < doc.getNumberOfPages(); i++) {
                 PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
@@ -61,19 +61,16 @@ public class PDFExtractor extends PDFGraphicsStreamEngine {
 
     static void processFile(File file) {
         String outPath = String.format("%s.0-3-1.txt.gz", file);
-        try {
-            PDDocument doc = PDDocument.load(file);
-
-            GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(outPath));
-            Writer w = new BufferedWriter(new OutputStreamWriter(gzip, "UTF-8"));
-            // Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"));
-
+        try (PDDocument doc = PDDocument.load(file);
+             GZIPOutputStream gzip = new GZIPOutputStream(new FileOutputStream(outPath));
+             Writer w = new BufferedWriter(new OutputStreamWriter(gzip, "UTF-8"));
+             // Writer w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outPath), "UTF-8"));
+        ) {
             for (int i = 0; i < doc.getNumberOfPages(); i++) {
                 PDFExtractor ext = new PDFExtractor(doc.getPage(i), i + 1, w);
                 ext.processPage(doc.getPage(i));
                 ext.write();
             }
-            w.close();
         }
         catch (Exception e) {
             System.out.println(e.getMessage());
