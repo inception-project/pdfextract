@@ -10,7 +10,7 @@
 
   <groupId>de.tudarmstadt.ukp.inception.pdfextract</groupId>
   <artifactId>pdfextract</artifactId>
-  <version>0.3.2.2-SNAPSHOT</version>
+  <version>0.3.2.2</version>
 
   <licenses>
     <license>
@@ -28,7 +28,7 @@
     <connection>scm:git:git://github.com/inception-project/pdfextract</connection>
     <developerConnection>scm:git:git@github.com:inception-project/pdfextract.git</developerConnection>
     <url>https://github.com/inception-project/pdfextract</url>
-    <tag>HEAD</tag>
+    <tag>inception-pdfextract-0.3.2.2</tag>
   </scm>
   <distributionManagement>
     <repository>
